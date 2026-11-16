@@ -1,0 +1,1599 @@
+<!doctype html><html lang="uk"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light dark}body{margin:0}</style><link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#f7f7f7"><link rel="apple-touch-icon" href="icon-192.png"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Плеєр"><title>Плеєр iOS 7</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&display=swap">
+<style>
+/* Layout: рамка 320x568. Зверху смужка часу і нав-бар, знизу таб-бар з п'яти вкладок, між ними екран зі списками. */
+:root{
+  --bg:#ffffff; --cell:#ffffff; --group:#efeff4; --outer:#dedee3; --fg:#000000; --sub:#8e8e93; --line:#c8c7cc;
+  --accent:#f9304f; --bar:rgba(248,248,248,.92); --track:#dcdce1; --chip:rgba(142,142,147,.16);
+  --ico:#929297; --chev:#c7c7cc; --shadow:rgba(0,0,0,.30);
+  --font:'Roboto','Helvetica Neue',Helvetica,Arial,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#000000; --cell:#1c1c1e; --group:#000000; --outer:#121214; --fg:#ffffff; --sub:#8e8e93; --line:#38383a;
+    --accent:#ff3b5c; --bar:rgba(22,22,24,.92); --track:#3a3a3d; --chip:rgba(150,150,160,.2);
+    --ico:#8e8e93; --chev:#5a5a5e; --shadow:rgba(0,0,0,.7); color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#000000; --cell:#1c1c1e; --group:#000000; --outer:#121214; --fg:#ffffff; --sub:#8e8e93; --line:#38383a;
+  --accent:#ff3b5c; --bar:rgba(22,22,24,.92); --track:#3a3a3d; --chip:rgba(150,150,160,.2);
+  --ico:#8e8e93; --chev:#5a5a5e; --shadow:rgba(0,0,0,.7); color-scheme:dark;
+}
+/* Вибір теми всередині плеєра (Ще → Тема) має пріоритет над системною */
+:root[data-skin="light"]{
+  --bg:#ffffff; --cell:#ffffff; --group:#efeff4; --outer:#dedee3; --fg:#000000; --sub:#8e8e93; --line:#c8c7cc;
+  --accent:#f9304f; --bar:rgba(248,248,248,.92); --track:#dcdce1; --chip:rgba(142,142,147,.16);
+  --ico:#929297; --chev:#c7c7cc; --shadow:rgba(0,0,0,.30); color-scheme:light;
+}
+:root[data-skin="dark"]{
+  --bg:#000000; --cell:#1c1c1e; --group:#000000; --outer:#121214; --fg:#ffffff; --sub:#8e8e93; --line:#38383a;
+  --accent:#ff3b5c; --bar:rgba(22,22,24,.92); --track:#3a3a3d; --chip:rgba(150,150,160,.2);
+  --ico:#8e8e93; --chev:#5a5a5e; --shadow:rgba(0,0,0,.7); color-scheme:dark;
+}
+html,body{height:100%}
+body{background:var(--outer);color:var(--fg);font-family:var(--font);font-weight:400;font-size:17px;overflow:hidden;-webkit-tap-highlight-color:transparent}
+*{box-sizing:border-box}
+button{font-family:inherit}
+svg{display:block}
+.g{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+/* Весь інтерфейс живе в рамці 320x568 (вертикальні 9:16), яку JS масштабує під вікно */
+body{position:relative}
+#app{--ex:0px;position:absolute;left:50%;top:50%;width:320px;height:calc(568px + var(--ex));background:var(--bg);overflow:hidden;transform:translate(-50%,-50%);transform-origin:50% 50%;box-shadow:0 0 0 1px var(--line),0 12px 60px var(--shadow)}
+
+/* Нав-бар iOS 7: смужка часу 20 пт і рядок 44 пт */
+.nav{position:absolute;top:0;left:0;right:0;height:64px;z-index:10;background:var(--bar);
+  -webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-bottom:.5px solid var(--line)}
+.nav-time{height:20px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:500;font-variant-numeric:tabular-nums}
+.nav-row{height:44px;display:flex;align-items:center}
+.nl,.nr{flex:1 1 0;min-width:0;display:flex;align-items:center;border:0;background:none;color:var(--accent);cursor:pointer;padding:0;font-size:17px}
+.nl{justify-content:flex-start;padding-left:8px;gap:6px;text-align:left}
+.nl.add{padding-left:15px}
+.nl span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.nl svg{width:12px;height:21px;flex:none;fill:none;stroke:var(--accent);stroke-width:2.8;stroke-linecap:round;stroke-linejoin:round}
+.nr{justify-content:flex-end;padding-right:8px;gap:6px;font-size:11px;line-height:12px;text-align:right}
+.nr svg{width:11px;height:20px;flex:none;fill:none;stroke:var(--accent);stroke-width:2.8;stroke-linecap:round;stroke-linejoin:round}
+.inv{visibility:hidden}
+.nav-title{flex:none;max-width:150px;font-size:17px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center}
+
+/* Екран */
+.scroll{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;padding-top:64px;padding-bottom:49px;overscroll-behavior:contain;background:var(--bg)}
+.scroll.grp{background:var(--group)}
+#screen{min-height:100%}
+#screen.push{animation:pushIn .3s cubic-bezier(.2,.8,.2,1)}
+#screen.pop{animation:popIn .3s cubic-bezier(.2,.8,.2,1)}
+@keyframes pushIn{from{transform:translateX(36px);opacity:.15}to{transform:none;opacity:1}}
+@keyframes popIn{from{transform:translateX(-28px);opacity:.15}to{transform:none;opacity:1}}
+.searchwrap{padding:8px 8px 6px;background:var(--bg)}
+.search{display:flex;align-items:center;gap:6px;height:30px;border-radius:8px;background:var(--chip);padding:0 8px;color:var(--sub)}
+.search input{flex:1;min-width:0;border:0;outline:0;background:transparent;color:var(--fg);font:inherit;font-size:15px;font-weight:300}
+.search input::placeholder{color:var(--sub)}
+.search input::-webkit-search-cancel-button{opacity:.6}
+.foot{padding:16px 24px 20px;text-align:center;color:var(--sub);font-size:12px;line-height:1.5}
+.sech{padding:16px 15px 6px;font-size:12px;font-weight:500;color:var(--sub);text-transform:uppercase;letter-spacing:.03em}
+.noc{position:absolute;left:0;right:0;top:64px;bottom:49px;z-index:5;overflow:hidden;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 28px 18px;background:#141c26}
+.noc.on{display:flex}
+.noc .nb{position:absolute;inset:0;background-size:cover;background-position:center}
+.noc .nd{position:absolute;inset:0;background:linear-gradient(180deg,rgba(8,12,22,.55) 0%,rgba(8,12,22,.2) 55%,rgba(8,12,22,.3) 100%)}
+.noc .nt,.noc .ns{position:relative;color:#38779e}
+.noc .nt{font-size:25px;font-weight:300;line-height:30px;margin-bottom:12px}
+.noc .ns{font-size:17px;font-weight:300;line-height:22px;max-width:290px}
+.empty{padding:70px 30px;text-align:center;color:var(--sub);font-size:14px;line-height:1.5}
+.empty b{display:block;color:var(--fg);font-size:17px;font-weight:500;margin-bottom:6px}
+.pill{margin-top:16px;border:1px solid var(--accent);background:none;color:var(--accent);font:inherit;font-size:15px;padding:7px 18px;border-radius:6px;cursor:pointer}
+
+/* Рядки треків */
+.trow{position:relative;display:flex;align-items:center;min-height:44.5px;padding-left:14px;cursor:pointer;background:var(--bg);-webkit-user-select:none;user-select:none}
+.trow::after,.lrow::after{content:"";position:absolute;left:14px;right:13px;bottom:0;height:.5px;background:var(--line)}
+.trow:active,.lrow:active{background:var(--chip)}
+@media (hover:hover){.trow:hover,.lrow:hover{background:var(--chip)}}
+.tnum{flex:none;width:26px;font-size:14px;color:var(--fg);opacity:.85;font-variant-numeric:tabular-nums}
+.tt{flex:1;min-width:0;font-size:15px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.trow.two{min-height:52px}
+.tt2{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.tt2 .t{font-size:15px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tt2 .s{font-size:12px;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.trow.on .tt2 .t{color:var(--accent)}
+.d{flex:none;width:30px;margin-right:15px;text-align:right;font-size:14px;color:var(--fg);opacity:.85;font-variant-numeric:tabular-nums}
+.cloud{flex:none;width:46px;height:44px;border:0;background:none;display:grid;place-items:center;padding:0;cursor:pointer}
+.cloudgap{flex:none;width:46px}
+.cloud svg,.abtn.cl svg{width:26px;height:26px}
+.cl-o{fill:none;stroke:var(--ico);stroke-width:1.2;stroke-linejoin:round}
+.cl-a{fill:none;stroke:var(--accent);stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.eq{display:none;align-items:flex-end;gap:2px;height:12px;flex:none}
+.eq i{display:block;width:3px;height:100%;background:var(--accent);transform-origin:bottom;animation:eq .9s ease-in-out infinite}
+.eq i:nth-child(2){animation-duration:.7s;animation-delay:-.3s}
+.eq i:nth-child(3){animation-duration:1.1s;animation-delay:-.6s}
+#app:not(.playing) .eq i{animation-play-state:paused}
+@keyframes eq{0%,100%{transform:scaleY(.25)}50%{transform:scaleY(1)}}
+.trow.on .eq{display:flex}
+.eq.l{position:absolute;left:14px;top:50%;margin-top:-6px}
+.eq.r{margin-right:8px}
+.trow.on .tnum{visibility:hidden}
+.trow:focus-visible,.lrow:focus-visible,.gcell:focus-visible,.tab:focus-visible,.nl:focus-visible,.nr:focus-visible,.mrow:focus-visible,.abtn:focus-visible,.cloud:focus-visible,.skseg button:focus-visible,.pill:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+
+/* Шапка альбому: позиції з еталона */
+.ahead{position:relative;height:117px;background:var(--bg)}
+.ahead::after{content:"";position:absolute;left:14px;right:13px;bottom:0;height:.5px;background:var(--line)}
+.acover{position:absolute;left:14px;top:13px;width:89px;height:89px;object-fit:cover;box-shadow:0 0 0 .5px var(--line)}
+.atitle{position:absolute;left:112px;right:12px;top:6px;line-height:26px;font-size:19px;font-weight:500;letter-spacing:-.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ameta{position:absolute;left:112px;right:12px;top:31px;line-height:18px;font-size:13px}
+.ameta b{font-weight:500}
+.ayear{position:absolute;left:112px;right:12px;top:49px;line-height:18px;font-size:13px;color:var(--fg);opacity:.62;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.abtn{position:absolute;width:44px;height:44px;display:grid;place-items:center;border:0;background:none;padding:0;cursor:pointer}
+.abtn.cl{left:233px;top:64px}
+.abtn.sh{left:276px;top:68px;color:var(--ico)}
+.abtn.sh svg{width:22px;height:18px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+
+/* Сітка альбомів, списки виконавців і станцій */
+.grid{display:grid;grid-template-columns:repeat(2,142px);gap:14px 12px;padding:14px 12px 18px}
+.gcell{display:block;min-width:0;background:none;border:0;padding:0;text-align:left;color:inherit;cursor:pointer}
+.gcell img{display:block;width:142px;height:142px;object-fit:cover;box-shadow:0 0 0 .5px var(--line)}
+.gname,.gart{display:block;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gname{font-weight:500;margin-top:6px}
+.gart{color:var(--sub);margin-top:1px}
+.lrow{position:relative;display:flex;align-items:center;gap:12px;min-height:52px;padding:0 12px 0 14px;cursor:pointer;background:var(--bg);-webkit-user-select:none;user-select:none}
+.lrow.big{min-height:68px}
+.lthumb{width:50px;height:50px;flex:none;object-fit:cover;box-shadow:0 0 0 .5px var(--line)}
+.lt{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.lt .t{font-size:15px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lt .s{font-size:12px;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chev{width:8px;height:14px;flex:none;fill:none;stroke:var(--chev);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+/* Ще: згруповані списки */
+.more{padding-bottom:18px}
+.gh{padding:22px 15px 7px;font-size:12px;color:var(--sub);text-transform:uppercase;letter-spacing:.02em}
+.gtab{background:var(--cell);border-top:.5px solid var(--line);border-bottom:.5px solid var(--line)}
+.mrow{position:relative;display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:44px;padding:0 15px;font-size:16px;cursor:pointer}
+.mrow+.mrow::before{content:"";position:absolute;top:0;left:15px;right:0;height:.5px;background:var(--line)}
+.mrow.red{color:var(--accent)}
+.mrow.dim{opacity:.45}
+#snow{position:absolute;left:0;top:0;width:100%;height:100%;z-index:90;pointer-events:none;display:none}
+#snow.on{display:block}
+.mrow.st{cursor:default}
+.mrow .msub{color:var(--sub);font-size:15px;text-align:right;line-height:18px;padding:6px 0}
+.amsg{margin:44px 28px 0;text-align:center;font-size:19px;line-height:26px;font-weight:500}
+.astkb{display:block;margin:18px auto 0;padding:0;border:0;background:none;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.astk{display:block;width:88px;height:88px;object-fit:contain;filter:brightness(.72);opacity:.9;-webkit-user-drag:none;user-select:none;pointer-events:none}
+.stkmsg{display:none;margin:12px 28px 0;padding:11px 14px;border-radius:12px;background:var(--cell);color:var(--fg);font-size:15px;line-height:20px;text-align:center;box-shadow:0 0 0 .5px var(--line)}
+.stkmsg.on{display:block;animation:bub .25s ease both}
+@keyframes bub{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.shimtxt{color:transparent;background:linear-gradient(90deg,var(--sub) 0%,var(--sub) 38%,var(--fg) 50%,var(--sub) 62%,var(--sub) 100%);background-size:300% 100%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;animation:shimmer 4s linear infinite}
+.mrow .msub small{display:block;font-size:12px;line-height:15px}
+.gf{padding:8px 15px 0;font-size:12px;line-height:1.45;color:var(--sub)}
+.skseg{display:flex;width:100%;border:1px solid var(--accent);border-radius:5px;overflow:hidden}
+.skseg button{flex:1;border:0;border-left:1px solid var(--accent);background:transparent;color:var(--accent);font:inherit;font-size:13px;font-weight:500;padding:6px 0;cursor:pointer}
+.skseg button:first-child{border-left:0}
+.skseg button.on{background:var(--accent);color:#fff}
+
+/* Таб-бар */
+.tabbar{position:absolute;left:0;right:0;bottom:0;height:49px;z-index:10;display:flex;background:var(--bar);
+  -webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-top:.5px solid var(--line)}
+.tab{flex:1;min-width:0;border:0;background:none;color:var(--ico);display:flex;flex-direction:column;align-items:center;padding:4px 0 0;cursor:pointer;font-family:inherit;font-size:10px;letter-spacing:.01em}
+.tab svg{width:30px;height:28px;display:block;flex:none}
+.tab span{margin-top:3px;line-height:12px;white-space:nowrap}
+.tab.sel{color:var(--accent)}
+.tab .fl{fill:none;stroke:currentColor;stroke-width:1.4}
+.tab.sel .fl{fill:currentColor;stroke:none}
+.tab .ln{fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round}
+.tab .fi{fill:currentColor}
+.tab .dot,.tab .nt{fill:currentColor}
+.tab.sel .dot,.tab.sel .nt{fill:var(--bg)}
+
+/* Now Playing: обкладинка на всю ширину під нав-баром, бігуча стрічка, три текстові кнопки внизу (позиції з еталона) */
+.sheet{position:absolute;inset:0;z-index:30;background:var(--bg);overflow:hidden;
+  transform:translateY(102%);visibility:hidden;transition:transform .38s cubic-bezier(.2,.8,.2,1),visibility 0s .38s}
+.sheet.open{transform:none;visibility:visible;transition:transform .38s cubic-bezier(.2,.8,.2,1),visibility 0s}
+.sh-nav{position:absolute;top:0;left:0;right:0;height:64px;z-index:2;background:var(--bar);
+  -webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-bottom:.5px solid var(--line)}
+.nr .lst{width:22px;height:18px;stroke-width:2.2}
+.nr .lst circle{fill:var(--accent);stroke:none}
+.s-art{position:absolute;left:0;top:64px;width:320px;height:320px;object-fit:cover;display:block;background:var(--chip)}
+.s-scrub{position:absolute;left:15px;right:12px;top:calc(388px + var(--ex) * .35);height:18px;display:flex;align-items:center;font-size:12px;color:var(--sub);font-variant-numeric:tabular-nums}
+.s-scrub span{flex:none;width:40px}
+.s-scrub span:last-child{width:44px;text-align:right}
+.s-scrub input{flex:1;min-width:0}
+/* Бігуча стрічка: якщо текст не вміщається, він їде по колу */
+.mq{position:absolute;left:0;right:0;overflow:hidden;white-space:nowrap;display:flex;justify-content:center}
+.mq-in{display:inline-flex;flex:none}
+.mq-in span{flex:none}
+.mq-in span:last-child{display:none}
+.mq.run{justify-content:flex-start}
+.mq.run .mq-in span:first-child{padding-right:48px}
+.mq.run .mq-in span:last-child{display:block}
+.mq.run .mq-in{animation:marq var(--md,10s) linear infinite}
+@keyframes marq{0%,10%{transform:translateX(0)}100%{transform:translateX(calc(var(--mw,0px) * -1))}}
+.s-title{top:calc(416px + var(--ex) * .35);height:26px;line-height:26px;font-size:17px;font-weight:500}
+.s-sub{top:calc(447px + var(--ex) * .35);height:20px;line-height:20px;font-size:12.5px;color:var(--sub)}
+.s-ctl{position:absolute;left:0;right:0;top:calc(474px + var(--ex) * .7);height:36px;display:flex;justify-content:center}
+.sbtn{width:86px;height:36px;border:0;background:none;color:var(--fg);display:grid;place-items:center;cursor:pointer;padding:0}
+.sbtn svg{fill:currentColor;overflow:visible}
+.sbtn.sk svg{width:28px;height:17px;stroke:currentColor;stroke-width:1.4;stroke-linejoin:round}
+.sbtn.pp svg{width:20px;height:24px}
+.sbtn:active{opacity:.45}
+.sbtn:focus-visible,.tbtn:focus-visible{outline:2px solid var(--accent);outline-offset:-2px;border-radius:6px}
+.s-vol{position:absolute;left:0;right:0;top:calc(516px + var(--ex) * .7);height:20px;display:flex;align-items:center;padding-left:26px;padding-right:22px;gap:14px;color:var(--sub)}
+.s-vol svg{flex:none;fill:currentColor}
+.s-vol .vlo{width:10px;height:12px}
+.s-vol .vhi{width:20px;height:15px;stroke:currentColor;stroke-width:1.3;stroke-linecap:round;margin-left:-8px}
+.s-vol input{flex:1;min-width:0}
+.s-modes{position:absolute;left:17px;right:16px;top:calc(546px + var(--ex));height:20px;display:grid;grid-template-columns:1fr auto 1fr;align-items:center}
+.s-modes #rep{justify-self:start}.s-modes #sheetLock{justify-self:center}.s-modes #shuf{justify-self:end}
+.s-modes .tbtn{white-space:nowrap}
+.tbtn{border:0;background:none;color:var(--accent);font:inherit;font-size:12px;line-height:16px;padding:2px 6px;margin:0 -6px;border-radius:4px;cursor:pointer}
+.tbtn[aria-pressed="true"]{background:var(--accent);color:#fff}
+#sheet input[type=range]{height:20px}
+#sheet input.sk::-webkit-slider-runnable-track{height:2px;border-radius:1px;background:linear-gradient(to right,var(--accent) var(--p),var(--track) var(--p))}
+#sheet input.sk::-moz-range-track{height:2px;border-radius:1px;background:var(--track)}
+#sheet input.sk::-moz-range-progress{height:2px;border-radius:1px;background:var(--accent)}
+#sheet input.sk::-webkit-slider-thumb{-webkit-appearance:none;width:2px;height:13px;border-radius:1px;background:var(--accent);margin-top:-5.5px;border:0}
+#sheet input.sk::-moz-range-thumb{width:2px;height:13px;border-radius:1px;background:var(--accent);border:0}
+#sheet input.vk::-webkit-slider-runnable-track{height:2px;border-radius:1px;background:linear-gradient(to right,var(--fg) var(--p),var(--track) var(--p))}
+#sheet input.vk::-moz-range-track{height:2px;border-radius:1px;background:var(--track)}
+#sheet input.vk::-moz-range-progress{height:2px;border-radius:1px;background:var(--fg)}
+#sheet input.vk::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:#fff;margin-top:-7px;border:0;box-shadow:0 0 0 .5px rgba(0,0,0,.25),0 1px 3px rgba(0,0,0,.35)}
+#sheet input.vk::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:#fff;border:0;box-shadow:0 0 0 .5px rgba(0,0,0,.25),0 1px 3px rgba(0,0,0,.35)}
+
+/* Повзунки */
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:28px;background:transparent;margin:0;cursor:pointer;--p:0%}
+input[type=range]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+input[type=range]::-webkit-slider-runnable-track{height:2px;border-radius:1px;background:linear-gradient(to right,var(--fg) var(--p),var(--track) var(--p))}
+input[type=range]::-moz-range-track{height:2px;border-radius:1px;background:var(--track)}
+input[type=range]::-moz-range-progress{height:2px;border-radius:1px;background:var(--fg)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:11px;height:11px;border-radius:50%;background:var(--fg);margin-top:-4.5px;border:0}
+input[type=range]::-moz-range-thumb{width:11px;height:11px;border-radius:50%;background:var(--fg);border:0}
+
+/* Іконки play/pause */
+.i-pause{display:none}
+#app.playing .i-play{display:none}
+#app.playing .i-pause{display:block}
+
+.toast{position:absolute;left:50%;bottom:62px;transform:translate(-50%,12px);max-width:calc(100% - 32px);z-index:50;
+  background:rgba(40,40,44,.92);color:#fff;font-size:14px;font-weight:400;padding:10px 16px;border-radius:18px;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;text-align:center}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.drop{position:absolute;inset:0;z-index:60;display:none;place-items:center;background:var(--bar);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+.drop.show{display:grid}
+.drop div{border:2px dashed var(--accent);border-radius:16px;padding:36px 28px;color:var(--accent);font-size:18px;font-weight:500;text-align:center;margin:16px}
+
+/* Екран блокування iOS 7. Позиції зняті з еталона 640x1136 (2x), тут у пунктах 320x568.
+   Фон: розмита обкладинка поточного треку (blur + насиченість + затемнення), перехід між треками плавний. */
+.lock{position:absolute;inset:0;z-index:70;color:#fff;overflow:hidden;background:#14161b;
+  opacity:0;visibility:hidden;transition:opacity .3s,visibility 0s .3s;-webkit-user-select:none;user-select:none}
+.lock.on{opacity:1;visibility:visible;transition:opacity .3s,visibility 0s}
+.lock.snap{transition:transform .3s cubic-bezier(.2,.8,.2,1),opacity .3s}
+.lock-bg{position:absolute;inset:0;background-size:cover;background-position:center;background-repeat:no-repeat;
+  opacity:0;transition:opacity .8s ease}
+.lock-bg.show{opacity:1}
+.lock.noart .lock-art,.lock.noart #deskArt{visibility:hidden}
+.lock-dim{position:absolute;inset:0;background:linear-gradient(180deg,rgba(6,10,18,.52) 0%,rgba(6,10,18,.26) 45%,rgba(6,10,18,.36) 100%)}
+.lock-stage{position:absolute;inset:0}
+.lock-time{position:absolute;left:0;right:0;top:2px;height:20px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500;font-variant-numeric:tabular-nums}
+.lock-scrub{position:absolute;left:15px;right:16.5px;top:30px;height:20px;display:flex;align-items:center;font-size:12px;font-weight:400;font-variant-numeric:tabular-nums;color:rgba(255,255,255,.6)}
+.lock-scrub span{flex:none;width:31px}
+.lock-scrub span:last-child{width:30px;text-align:right}
+.lock-scrub input{flex:1;min-width:0}
+.lock-title{position:absolute;left:16px;right:16px;top:51px;line-height:20px;text-align:center;font-size:17px;font-weight:400;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lock-sub{position:absolute;left:16px;right:16px;top:72.5px;line-height:20px;text-align:center;font-size:12.5px;font-weight:400;color:rgba(255,255,255,.52);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lock-ctl{position:absolute;left:0;right:0;top:97px;height:36px;display:flex;justify-content:center}
+.lbtn{width:74px;height:36px;border:0;background:none;color:#fff;display:grid;place-items:center;cursor:pointer;padding:0}
+.lbtn svg{fill:currentColor;overflow:visible}
+.lbtn.sk svg{width:27.5px;height:16px;stroke:currentColor;stroke-width:1.4;stroke-linejoin:round}
+.lbtn.pp svg{width:17px;height:20px}
+.lbtn:active{opacity:.5}
+.lbtn:focus-visible{outline:2px solid rgba(255,255,255,.7);outline-offset:-3px;border-radius:8px}
+.lock-vol{position:absolute;left:0;right:0;top:135px;height:21px;display:flex;align-items:center;padding-left:26px;padding-right:15px;gap:13px;color:rgba(255,255,255,.55)}
+.lock-vol svg{flex:none;fill:currentColor}
+.lock-vol .vlo{width:9px;height:11px}
+.lock-vol .vhi{width:20px;height:15px;stroke:currentColor;stroke-width:1.3;stroke-linecap:round}
+.lock-vol input{flex:1;min-width:0}
+.lock-art{position:absolute;left:15px;top:calc(178px + var(--ex) * .4);width:290px;height:290px}
+.lock-art img{display:block;width:100%;height:100%;object-fit:cover;box-shadow:0 0 0 .5px rgba(255,255,255,.16),0 6px 24px rgba(0,0,0,.28)}
+.lock{--slb:rgba(255,255,255,.42)}
+.lock[data-tone=dark]{--slb:rgba(0,10,26,.9)}
+.lock-slide{position:absolute;left:0;right:0;top:calc(478px + var(--ex));height:64px;display:flex;align-items:center;justify-content:center;gap:12px;padding:0 2.5px 0 0;cursor:grab;touch-action:none;outline:0}
+.lock-slide:active{cursor:grabbing}
+.lock-slide svg{width:10px;height:23.5px;flex:none;fill:none;stroke:var(--slb);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.shimmer{display:block;flex:none;white-space:nowrap;font-size:21.6px;font-weight:500;letter-spacing:0;color:transparent;
+  background:linear-gradient(90deg,var(--slb) 0%,var(--slb) 38%,rgba(255,255,255,.98) 50%,var(--slb) 62%,var(--slb) 100%);
+  background-size:300% 100%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;animation:shimmer 2.8s linear infinite}
+@keyframes shimmer{from{background-position:100% 0}to{background-position:0 0}}
+/* ---------- десктопний режим 16:9: обкладинка зліва, права панель (екран блокування / інтерфейс плеєра) ---------- */
+#phone{position:absolute;left:0;top:0;width:320px;height:calc(568px + var(--ex));overflow:hidden;background:var(--bg)}
+#deskBg,#deskArt,.lock-cam{display:none}
+#deskBg,#deskArt,.lock-cam{pointer-events:none}
+#app.desk{width:1280px;height:720px;box-shadow:none;background:#0b0d12}
+.desk #deskBg{display:block;position:absolute;inset:0;overflow:hidden}
+.desk #dBg{position:absolute;inset:0;background-size:cover;background-position:center}
+.desk .ddim{position:absolute;inset:0;background:linear-gradient(180deg,rgba(6,10,18,.5) 0%,rgba(6,10,18,.24) 45%,rgba(6,10,18,.34) 100%)}
+.desk #deskArt{display:block;position:absolute;left:40px;top:40px;width:640px;height:640px}
+.desk #deskArt img{display:block;width:100%;height:100%;object-fit:cover;box-shadow:0 0 0 .5px rgba(255,255,255,.16),0 10px 40px rgba(0,0,0,.4)}
+#app.desk:has(#lock.on) #phone{visibility:hidden}
+.desk .lock{background:#0b0d12}
+.desk .lock-stage{left:720px}
+.desk .lock.on{transition:opacity .5s,visibility 0s}
+.desk .lock.on.snap{transition:transform .38s cubic-bezier(.2,.8,.2,1),opacity .3s}
+#app.desk.deskout #phone{visibility:visible!important;transform-origin:0 0;transform:translate(var(--px),var(--py)) scale(var(--pk))}
+#app.desk.deskout{background:var(--outer)}
+.desk .lock-bg,.desk .lock-dim,.desk .lock-art,.desk .lock-time{display:none}
+.desk .lock-title{left:20px;right:20px;top:132px;line-height:42px;font-size:30px}
+.desk .lock-sub{left:20px;right:20px;top:179px;line-height:32px;font-size:22px}
+.desk .lock-scrub{left:42px;right:38px;top:252px;height:28px;font-size:17px}
+.desk .lock-scrub span{width:48px}.desk .lock-scrub span:last-child{width:46px}
+.desk .lock-ctl{top:342px;height:64px}
+.desk .lbtn{width:124px;height:64px}
+.desk .lbtn.sk svg{width:46px;height:27px}
+.desk .lbtn.pp svg{width:28px;height:34px}
+.desk .lock-vol{top:443px;height:34px;padding-left:40px;padding-right:24px;gap:20px}
+.desk .lock-vol .vlo{width:14px;height:17px}
+.desk .lock-vol .vhi{width:30px;height:22px}
+.desk .lock-slide{top:578px;height:96px;gap:18px;padding:0 4px 0 0}
+.desk .lock-slide svg{width:15px;height:35px}
+.desk .shimmer{font-size:32px}
+.desk .lock-grab{left:253px;top:692px;width:54px;height:11px;margin-left:0;border-radius:5.5px}
+.desk .lock-cam{display:block;position:absolute;right:26px;bottom:18px;width:44px;height:33px;fill:rgba(255,255,255,.55)}
+.desk .lock input.lseek[type=range]::-webkit-slider-runnable-track{height:4px;border-radius:2px}
+.desk .lock input.lseek[type=range]::-webkit-slider-thumb{width:3px;height:24px;margin-top:-10px}
+.desk .lock input.lvol[type=range]::-webkit-slider-runnable-track{height:3px;border-radius:1.5px}
+.desk .lock input.lvol[type=range]::-webkit-slider-thumb{width:24px;height:24px;margin-top:-10.5px}
+.lock-grab{position:absolute;left:50%;top:calc(551.5px + var(--ex));width:36px;height:7px;margin-left:-18px;border-radius:3.5px;background:rgba(232,232,238,.62);pointer-events:none}
+.lock-slide:focus-visible .shimmer{text-decoration:underline;text-decoration-color:rgba(255,255,255,.5);text-underline-offset:6px}
+.lock input[type=range]{height:20px}
+.lock input.lseek[type=range]::-webkit-slider-runnable-track{height:3px;border-radius:1.5px;background:linear-gradient(to right,rgba(255,255,255,.42) var(--p),rgba(0,0,0,.42) var(--p))}
+.lock input.lseek[type=range]::-moz-range-track{height:3px;border-radius:1.5px;background:rgba(0,0,0,.42)}
+.lock input.lseek[type=range]::-moz-range-progress{height:3px;border-radius:1.5px;background:rgba(255,255,255,.42)}
+.lock input.lseek[type=range]::-webkit-slider-thumb{width:2px;height:15px;border-radius:1px;background:#fff;margin-top:-6px}
+.lock input.lseek[type=range]::-moz-range-thumb{width:2px;height:15px;border-radius:1px;background:#fff;border:0}
+.lock input.lvol[type=range]::-webkit-slider-runnable-track{height:2px;border-radius:1px;background:linear-gradient(to right,#fff var(--p),rgba(255,255,255,.38) var(--p))}
+.lock input.lvol[type=range]::-moz-range-track{height:2px;border-radius:1px;background:rgba(255,255,255,.38)}
+.lock input.lvol[type=range]::-moz-range-progress{height:2px;border-radius:1px;background:#fff}
+.lock input.lvol[type=range]::-webkit-slider-thumb{width:16px;height:16px;border-radius:50%;background:#fff;margin-top:-7px;box-shadow:0 1px 3px rgba(0,0,0,.35)}
+.lock input.lvol[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:#fff;border:0}
+
+@media (prefers-reduced-motion:reduce){
+  .sheet,.sheet.open,.toast,.lock,.lock.on,.lock.snap{transition:none}
+  .eq i{animation:none;transform:scaleY(.7)}
+  #screen.push,#screen.pop{animation:none}
+  .mq.run .mq-in{animation:none}
+  .shimmer,.shimtxt{animation:none;background-position:50% 0}
+}
+@media (hover:none){.nav,.tabbar,.sh-nav,.drop{-webkit-backdrop-filter:none;backdrop-filter:none}#app{box-shadow:none}
+  .nav,.tabbar,.sh-nav{background:linear-gradient(var(--bar),var(--bar)),var(--bg)}}
+/* комп'ютер: справжнє CSS-розмиття (м'якше), для телефонів - заздалегідь розмите зображення */
+#app.blurlive .lock-bg,#app.blurlive #dBg{inset:-70px;-webkit-filter:blur(34px) saturate(1.9) brightness(.66);filter:blur(34px) saturate(1.9) brightness(.66)}
+#app.blurlive .noc .nb{inset:-60px;-webkit-filter:blur(34px) saturate(1.9) brightness(.42);filter:blur(34px) saturate(1.9) brightness(.42)}
+</style>
+
+</head><body><div id="app">
+  <div id="phone">
+  <div class="scroll" id="scroll"><div id="screen"></div></div>
+  <div class="noc" id="noc" aria-live="polite"><div class="nb" id="nocBg"></div><div class="nd"></div><div class="nt" data-i18n="noContentT">Немає вмісту</div><div class="ns" data-i18n="noContentS">Ви можете завантажити музику з iTunes Store</div></div>
+
+  <header class="nav">
+    <div class="nav-time" id="navTime"></div>
+    <div class="nav-row">
+      <button class="nl inv" id="navLeft" type="button"></button>
+      <div class="nav-title" id="navTitle"></div>
+      <button class="nr inv" id="navNow" type="button" data-i18n-aria="navNowAria" aria-label="Зараз грає"><span data-i18n-html="navNowHtml">Зараз<br>грає</span><svg viewBox="0 0 12 21" aria-hidden="true"><path d="M2 2l7.5 8.5L2 19"/></svg></button>
+    </div>
+  </header>
+
+  <nav class="tabbar" id="tabbar" data-i18n-aria="tabsAria" aria-label="Розділи">
+    <button class="tab" type="button" data-tab="artists"><svg viewBox="0 0 30 28" aria-hidden="true"><g class="fi"><circle cx="21" cy="9" r="6"/><path d="M11 26c.4-4.8 4.4-7.8 10-7.8S29.6 21.2 30 26z"/><circle cx="6.5" cy="9.5" r="3.6"/><rect x="5.85" y="13" width="1.3" height="12.5"/><rect x="2.5" y="25" width="8" height="1.4" rx=".7"/><path d="M2.6 15.5c0 3 1.8 4.4 3.9 4.4s3.9-1.4 3.9-4.4" fill="none" stroke="currentColor" stroke-width="1.2"/></g></svg><span data-i18n="tabArtists">Виконавці</span></button>
+    <button class="tab" type="button" data-tab="albums"><svg viewBox="0 0 30 28" aria-hidden="true"><path class="ln" d="M7 2.8h16M5 6h20"/><rect class="fl" x="3" y="8.5" width="24" height="18.5" rx="3"/><g class="nt"><rect x="13.4" y="14" width="1.5" height="7.6"/><rect x="19.6" y="12.6" width="1.5" height="7.6"/><path d="M13.4 14.2l7.2-1.7v2.2l-7.2 1.7z"/><ellipse cx="12.2" cy="21.8" rx="2.2" ry="1.7"/><ellipse cx="18.4" cy="20.4" rx="2.2" ry="1.7"/></g></svg><span data-i18n="tabAlbums">Альбоми</span></button>
+    <button class="tab" type="button" data-tab="songs"><svg viewBox="0 0 30 28" aria-hidden="true"><g class="fi"><rect x="13.2" y="3" width="2.2" height="18.5"/><path d="M15.4 3L22.5 5.8V10L15.4 7.2z"/><ellipse cx="11.4" cy="22" rx="4.4" ry="3.4"/></g></svg><span data-i18n="tabSongs">Пісні</span></button>
+    <button class="tab" type="button" data-tab="more"><svg viewBox="0 0 30 28" aria-hidden="true"><circle class="fl" cx="6" cy="14" r="2.4"/><circle class="fl" cx="15" cy="14" r="2.4"/><circle class="fl" cx="24" cy="14" r="2.4"/></svg><span data-i18n="tabMore">Ще</span></button>
+  </nav>
+
+  <section class="sheet" id="sheet" aria-label="Зараз грає" data-i18n-aria="aSheet">
+    <div class="sh-nav">
+      <div class="nav-time" id="sheetTime"></div>
+      <div class="nav-row">
+        <button class="nl" id="closeSheet" type="button" aria-label="Назад" data-i18n-aria="aBack"><svg viewBox="0 0 12 21" aria-hidden="true"><path d="M10 2L2.5 10.5 10 19"/></svg></button>
+        <div class="nav-title" id="sCount"></div>
+        <button class="nr" id="sList" type="button" aria-label="Показати альбом" data-i18n-aria="aList"><svg class="lst" viewBox="0 0 22 18" aria-hidden="true"><path d="M8 3h13M8 9h13M8 15h13"/><circle cx="2.5" cy="3" r="1.4"/><circle cx="2.5" cy="9" r="1.4"/><circle cx="2.5" cy="15" r="1.4"/></svg></button>
+      </div>
+    </div>
+    <img class="s-art" id="sArt" alt="">
+    <div class="s-scrub">
+      <span id="tCur">0:00</span>
+      <input id="seek" class="sk" type="range" min="0" max="1000" step="1" value="0" aria-label="Перемотка" data-i18n-aria="aSeek">
+      <span id="tRem">-0:00</span>
+    </div>
+    <div class="mq s-title" id="sTitle"><div class="mq-in"></div></div>
+    <div class="mq s-sub" id="sSub"><div class="mq-in"></div></div>
+    <div class="s-ctl">
+      <button class="sbtn sk" id="prev" type="button" aria-label="Попередній трек" data-i18n-aria="aPrev"><svg viewBox="0 0 28 16"><path d="M14.5 .8v14.4L1.5 8zM27.5 .8v14.4L14.5 8z"/></svg></button>
+      <button class="sbtn pp" id="play" type="button" aria-label="Відтворити або пауза" data-i18n-aria="aPlay">
+        <svg class="i-play" viewBox="0 0 17 20"><path d="M1.5 1.6v16.8L15.5 10z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+        <svg class="i-pause" viewBox="0 0 17 20"><rect x="0" y="0" width="5.5" height="20" rx="1"/><rect x="11.5" y="0" width="5.5" height="20" rx="1"/></svg>
+      </button>
+      <button class="sbtn sk" id="next" type="button" aria-label="Наступний трек" data-i18n-aria="aNext"><svg viewBox="0 0 28 16"><path d="M.5 .8v14.4L13.5 8zM13.5 .8v14.4L26.5 8z"/></svg></button>
+    </div>
+    <div class="s-vol">
+      <svg class="vlo" viewBox="0 0 9 11" aria-hidden="true"><path d="M0 3.3h3L9 0v11L3 7.7H0z" stroke="none"/></svg>
+      <input id="vol" class="vk" type="range" min="0" max="100" step="1" value="80" aria-label="Гучність" data-i18n-aria="aVol">
+      <svg class="vhi" viewBox="0 0 20 15" aria-hidden="true"><path d="M0 4.3h3.5L9 0v15L3.5 10.7H0z" stroke="none"/><path d="M11.6 4.2a4.4 4.4 0 0 1 0 6.6M14.2 2a8 8 0 0 1 0 11M16.8 .3a11.2 11.2 0 0 1 0 14.4" fill="none"/></svg>
+    </div>
+    <div class="s-modes">
+      <button class="tbtn" id="rep" type="button" aria-pressed="false" data-mode="off"><span id="repTxt">Повтор</span></button>
+      <button class="tbtn" id="sheetLock" type="button"><span data-i18n="lockBtn">Заблокувати</span></button>
+      <button class="tbtn" id="shuf" type="button" aria-pressed="false"><span data-i18n="shuffleBtn">Перемішати</span></button>
+    </div>
+  </section>
+
+  </div>
+  <section class="lock" id="lock" aria-label="Екран блокування" data-i18n-aria="aLock" aria-hidden="true">
+    <div id="deskBg" aria-hidden="true"><div class="dbg" id="dBg"></div><div class="ddim"></div></div>
+    <div id="deskArt" aria-hidden="true"><img id="dArt" alt=""></div>
+    <div class="lock-bg" id="lBgA"></div>
+    <div class="lock-bg" id="lBgB"></div>
+    <div class="lock-dim"></div>
+    <div class="lock-stage" id="lStage">
+      <div class="lock-time" id="lTime">12:00</div>
+      <div class="lock-scrub">
+        <span id="lCur">0:00</span>
+        <input id="lSeek" class="lseek" type="range" min="0" max="1000" step="1" value="0" aria-label="Перемотка" data-i18n-aria="aSeek">
+        <span id="lRem">-0:00</span>
+      </div>
+      <div class="lock-title" id="lTitle"></div>
+      <div class="lock-sub" id="lSub"></div>
+      <div class="lock-ctl">
+        <button class="lbtn sk" id="lPrev" type="button" aria-label="Попередній трек" data-i18n-aria="aPrev"><svg viewBox="0 0 28 16"><path d="M14.5 .8v14.4L1.5 8zM27.5 .8v14.4L14.5 8z"/></svg></button>
+        <button class="lbtn pp" id="lPlay" type="button" aria-label="Відтворити або пауза" data-i18n-aria="aPlay">
+          <svg class="i-play" viewBox="0 0 17 20"><path d="M1.5 1.6v16.8L15.5 10z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+          <svg class="i-pause" viewBox="0 0 17 20"><rect x="0" y="0" width="5.5" height="20" rx="1"/><rect x="11.5" y="0" width="5.5" height="20" rx="1"/></svg>
+        </button>
+        <button class="lbtn sk" id="lNext" type="button" aria-label="Наступний трек" data-i18n-aria="aNext"><svg viewBox="0 0 28 16"><path d="M.5 .8v14.4L13.5 8zM13.5 .8v14.4L26.5 8z"/></svg></button>
+      </div>
+      <div class="lock-vol">
+        <svg class="vlo" viewBox="0 0 9 11" aria-hidden="true"><path d="M0 3.3h3L9 0v11L3 7.7H0z" stroke="none"/></svg>
+        <input id="lVol" class="lvol" type="range" min="0" max="100" step="1" value="80" aria-label="Гучність" data-i18n-aria="aVol">
+        <svg class="vhi" viewBox="0 0 20 15" aria-hidden="true"><path d="M0 4.3h3.5L9 0v15L3.5 10.7H0z" stroke="none"/><path d="M11.6 4.2a4.4 4.4 0 0 1 0 6.6M14.2 2a8 8 0 0 1 0 11M16.8 .3a11.2 11.2 0 0 1 0 14.4" fill="none"/></svg>
+      </div>
+      <div class="lock-art"><img id="lArt" alt=""></div>
+      <div class="lock-slide" id="lSlide" role="button" tabindex="0" aria-label="Розблокувати: проведи вправо або натисни Enter" data-i18n-aria="aUnlock">
+        <svg viewBox="0 0 10 22" aria-hidden="true"><path d="M1.5 1.5L8.5 11l-7 9.5"/></svg>
+        <span class="shimmer" id="lSlideTxt" data-i18n="slideTxt">посуньте, щоб відімкнути</span>
+      </div>
+      <svg class="lock-cam" viewBox="0 0 44 33" aria-hidden="true"><path d="M2 8a3 3 0 0 1 3-3h7l2.5-4h15L32 5h7a3 3 0 0 1 3 3v21a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3z"/><circle cx="22" cy="18" r="8.5" fill="none" stroke="#000" stroke-opacity=".35" stroke-width="3"/></svg>
+      <div class="lock-grab" aria-hidden="true"></div>
+    </div>
+  </section>
+
+  <div class="toast" id="toast" role="status"></div>
+  <canvas id="snow" aria-hidden="true"></canvas>
+  <div class="drop" id="drop"><div data-i18n="dropTxt">Відпусти аудіофайли, щоб додати</div></div>
+  <input type="file" id="dir" webkitdirectory directory multiple hidden>
+  <input type="file" id="file" accept="audio/*,image/*,.mp3,.m4a,.aac,.flac,.ogg,.opus,.wav" multiple hidden>
+</div>
+
+<script>
+(function(){
+  'use strict';
+  var $ = function(s){ return document.querySelector(s); };
+  var app = $('#app'), sheet = $('#sheet'), scrollEl = $('#scroll'), screenEl = $('#screen');
+  var seek = $('#seek'), vol = $('#vol'), toastEl = $('#toast');
+  var scaleK = 1, deskMode = false, deskPref = false, appH = 568, adaptPref = true;
+  try{ adaptPref = localStorage.getItem('ios7player.adapt') !== '0'; }catch(e){}
+  try{ deskPref = localStorage.getItem('ios7player.desk') === '1'; }catch(e){}
+  var autoSec = 30;
+  try{ var as_ = localStorage.getItem('ios7player.auto'); if(as_ !== null && [0,30,60,300].indexOf(+as_) >= 0) autoSec = +as_; }catch(e){}
+  function fitApp(){
+    var r = document.body.getBoundingClientRect();
+    if(!r.width || !r.height) return;
+    appH = 568;
+    if(!deskMode && adaptPref) appH = Math.max(568, Math.min(780, Math.round(320 * r.height / r.width)));
+    app.style.setProperty('--ex', deskMode ? '0px' : (appH - 568) + 'px');
+    scaleK = deskMode ? Math.min(r.width / 1280, r.height / 720) : Math.min(r.width / 320, r.height / appH);
+    app.style.transform = 'translate(-50%,-50%) scale(' + scaleK + ')';
+  }
+  window.addEventListener('resize', fitApp);
+  fitApp();
+  var lockEl = $('#lock'), lSeek = $('#lSeek'), lVol = $('#lVol'), seeks = [seek, lSeek], scrubSrc = null, locked = false;
+
+  var audio = new Audio();
+  audio.preload = 'metadata';
+
+  var tracks = [], byIdMap = new Map(), nextId = 1;
+  var query = '', blobOf = new Map();
+  var vis = [], queue = [], order = [], cur = null;
+  var shuffle = false, repeat = 'off', scrub = false, failStreak = 0;
+  /* ---------- мови: English, Українська, Ελληνικά ---------- */
+  var LANGS = {en:'English', uk:'Українська', el:'Ελληνικά'};
+  var LOC = {uk:'uk-UA', en:'en-GB', el:'el-GR'};
+  var lang = 'uk';
+  var coll = new Intl.Collator('uk', {numeric:true, sensitivity:'base'});
+  var I18N = {
+    uk:{
+      tabArtists:"Виконавці", tabAlbums:"Альбоми", tabSongs:"Пісні", tabMore:"Ще",
+      navNowHtml:"Зараз<br>грає", navNowAria:"Зараз грає", tabsAria:"Розділи",
+      add:"Додати", backTo:"Назад: {t}", search:"Пошук", searchAria:"Пошук по піснях", noResults:"Нічого не знайдено",
+      noContentT:"Немає вмісту", noContentS:"Ви можете завантажити музику з iTunes Store", emptyTitle:"Тут поки порожньо", emptyText:"Додай свої треки, і вони з'являться тут.", emptyBtn:"Додати музику",
+      hMusic:"Музика", addMusic:"Додати музику…", saveAll:"Зберегти все в браузері", hScreen:"Екран", lockScreen:"Екран блокування",
+      hTheme:"Тема", themeLight:"Біла", themeDark:"Темна", themeAuto:"Авто", hLang:"Мова", hStorage:"Сховище", clearStorage:"Очистити сховище",
+      storageNote:"У сховищі браузера: {songs}. Збережені пісні лишаються після перезавантаження сторінки. Файли нікуди не вантажаться.",
+      wSong:"пісня|пісні|пісень", wAlbum:"альбом|альбоми|альбомів", wTrack:"трек|треки|треків", min:"хв",
+      unkArtist:"Невідомий виконавець", unkAlbum:"Невідомий альбом", ofCount:"{i} з {n}",
+      shuffleBtn:"Перемішати", repeatBtn:"Повтор", lockBtn:"Заблокувати",
+      addFolder:"Додати папку…", deskMode:"Десктопна версія (16:9)", snowMode:"Сніжочок", authors:"Автори", aKitty:"Дімина Киця", aMsg:"Вибач що не зміг врятувати наші стосунки, я завжди хотів залишатися твоїм..", aMsg2:"Учора 15.11 під час нашої розмови я намагався себе різати", adaptMode:"Адаптувати під нові дисплеї", hAuto:"Автоблокування", al30:"30 с", al60:"1 хв", al300:"5 хв", al0:"Вимк.", tAdded:"Додано: {n} {w}", tDupe:"Ці файли вже в списку", tNoAudio:"Тут немає аудіофайлів", tPlayFail:"Не вдалося відтворити файл",
+      tSaved:"Збережено в браузері: {n}", tSaveFail:"Не вдалося зберегти: сховище браузера недоступне", tCleared:"Сховище очищено", tClearFail:"Не вдалося очистити сховище",
+      tShufOn:"Випадковий порядок: увімкнено", tShufOff:"Випадковий порядок: вимкнено", tRepOff:"Повтор вимкнено", tRepAll:"Повтор усіх треків", tRepOne:"Повтор одного треку",
+      aSeek:"Перемотка", aVol:"Гучність", aPrev:"Попередній трек", aNext:"Наступний трек", aPlay:"Відтворити або пауза", aBack:"Назад", aList:"Показати альбом",
+      aSaveTrack:"Зберегти в браузері", aSaveAlbum:"Зберегти альбом в браузері", aShuffleAlbum:"Перемішати альбом", aSheet:"Зараз грає", aLock:"Екран блокування",
+      aUnlock:"Розблокувати: проведи вправо або натисни Enter", slideTxt:"посуньте, щоб відімкнути", dropTxt:"Відпусти аудіофайли або папку, щоб додати"
+    },
+    en:{
+      tabArtists:"Artists", tabAlbums:"Albums", tabSongs:"Songs", tabMore:"More",
+      navNowHtml:"Now<br>Playing", navNowAria:"Now Playing", tabsAria:"Sections",
+      add:"Add", backTo:"Back: {t}", search:"Search", searchAria:"Search songs", noResults:"No results",
+      noContentT:"No Content", noContentS:"You can download music from the iTunes Store", emptyTitle:"Nothing here yet", emptyText:"Add your tracks and they will appear here.", emptyBtn:"Add music",
+      hMusic:"Music", addMusic:"Add music…", saveAll:"Save all in browser", hScreen:"Screen", lockScreen:"Lock screen",
+      hTheme:"Theme", themeLight:"White", themeDark:"Dark", themeAuto:"Auto", hLang:"Language", hStorage:"Storage", clearStorage:"Clear storage",
+      storageNote:"In browser storage: {songs}. Saved songs stay after the page is reloaded. Files are never uploaded.",
+      wSong:"song|songs", wAlbum:"album|albums", wTrack:"track|tracks", min:"min",
+      unkArtist:"Unknown Artist", unkAlbum:"Unknown Album", ofCount:"{i} of {n}",
+      shuffleBtn:"Shuffle", repeatBtn:"Repeat", lockBtn:"Lock",
+      addFolder:"Add folder…", deskMode:"Desktop version (16:9)", snowMode:"Snowfall", authors:"Authors", aKitty:"Dima's Kitty", aMsg:"I'm sorry I couldn't save our relationship, I always wanted to stay yours..", aMsg2:"Yesterday, 15.11, during our conversation I was trying to cut myself", adaptMode:"Fit modern displays", hAuto:"Auto-Lock", al30:"30 s", al60:"1 min", al300:"5 min", al0:"Off", tAdded:"Added: {n} {w}", tDupe:"These files are already in the list", tNoAudio:"No audio files here", tPlayFail:"Could not play this file",
+      tSaved:"Saved in browser: {n}", tSaveFail:"Could not save: browser storage is unavailable", tCleared:"Storage cleared", tClearFail:"Could not clear storage",
+      tShufOn:"Shuffle: on", tShufOff:"Shuffle: off", tRepOff:"Repeat off", tRepAll:"Repeat all", tRepOne:"Repeat one",
+      aSeek:"Seek", aVol:"Volume", aPrev:"Previous track", aNext:"Next track", aPlay:"Play or pause", aBack:"Back", aList:"Show album",
+      aSaveTrack:"Save in browser", aSaveAlbum:"Save album in browser", aShuffleAlbum:"Shuffle album", aSheet:"Now Playing", aLock:"Lock screen",
+      aUnlock:"Unlock: swipe right or press Enter", slideTxt:"slide to unlock", dropTxt:"Drop audio files or a folder to add them"
+    },
+    el:{
+      tabArtists:"Καλλιτέχνες", tabAlbums:"Άλμπουμ", tabSongs:"Τραγούδια", tabMore:"Περισσότερα",
+      navNowHtml:"Τώρα<br>παίζει", navNowAria:"Τώρα παίζει", tabsAria:"Ενότητες",
+      add:"Προσθήκη", backTo:"Πίσω: {t}", search:"Αναζήτηση", searchAria:"Αναζήτηση τραγουδιών", noResults:"Δεν βρέθηκαν αποτελέσματα",
+      noContentT:"Δεν υπάρχει περιεχόμενο", noContentS:"Μπορείτε να κατεβάσετε μουσική από το iTunes Store", emptyTitle:"Δεν υπάρχει τίποτα ακόμη", emptyText:"Προσθέστε τα κομμάτια σας και θα εμφανιστούν εδώ.", emptyBtn:"Προσθήκη μουσικής",
+      hMusic:"Μουσική", addMusic:"Προσθήκη μουσικής…", saveAll:"Αποθήκευση όλων στον περιηγητή", hScreen:"Οθόνη", lockScreen:"Οθόνη κλειδώματος",
+      hTheme:"Θέμα", themeLight:"Φωτεινό", themeDark:"Σκούρο", themeAuto:"Αυτόματο", hLang:"Γλώσσα", hStorage:"Αποθήκευση", clearStorage:"Εκκαθάριση αποθήκευσης",
+      storageNote:"Στην αποθήκευση του περιηγητή: {songs}. Τα αποθηκευμένα τραγούδια παραμένουν μετά την επαναφόρτωση της σελίδας. Τα αρχεία δεν ανεβαίνουν πουθενά.",
+      wSong:"τραγούδι|τραγούδια", wAlbum:"άλμπουμ|άλμπουμ", wTrack:"κομμάτι|κομμάτια", min:"λεπ.",
+      unkArtist:"Άγνωστος καλλιτέχνης", unkAlbum:"Άγνωστο άλμπουμ", ofCount:"{i} από {n}",
+      shuffleBtn:"Τυχαία", repeatBtn:"Επανάληψη", lockBtn:"Κλείδωμα",
+      addFolder:"Προσθήκη φακέλου…", deskMode:"Έκδοση επιφάνειας εργασίας (16:9)", snowMode:"Χιονόπτωση", authors:"Δημιουργοί", aKitty:"Η γατούλα του Ντίμα", aMsg:"Συγγνώμη που δεν μπόρεσα να σώσω τη σχέση μας, πάντα ήθελα να παραμείνω δικός σου..", aMsg2:"Χθες 15.11, κατά τη διάρκεια της συζήτησής μας, προσπαθούσα να κόψω τον εαυτό μου", adaptMode:"Προσαρμογή σε νέες οθόνες", hAuto:"Αυτόματο κλείδωμα", al30:"30 δλ", al60:"1 λ", al300:"5 λ", al0:"Όχι", tAdded:"Προστέθηκαν: {n} {w}", tDupe:"Αυτά τα αρχεία υπάρχουν ήδη", tNoAudio:"Δεν υπάρχουν αρχεία ήχου εδώ", tPlayFail:"Δεν ήταν δυνατή η αναπαραγωγή του αρχείου",
+      tSaved:"Αποθηκεύτηκαν στον περιηγητή: {n}", tSaveFail:"Αποτυχία αποθήκευσης: η αποθήκευση του περιηγητή δεν είναι διαθέσιμη", tCleared:"Η αποθήκευση καθαρίστηκε", tClearFail:"Αποτυχία εκκαθάρισης",
+      tShufOn:"Τυχαία σειρά: ενεργή", tShufOff:"Τυχαία σειρά: ανενεργή", tRepOff:"Η επανάληψη απενεργοποιήθηκε", tRepAll:"Επανάληψη όλων", tRepOne:"Επανάληψη ενός κομματιού",
+      aSeek:"Αναζήτηση στο κομμάτι", aVol:"Ένταση", aPrev:"Προηγούμενο κομμάτι", aNext:"Επόμενο κομμάτι", aPlay:"Αναπαραγωγή ή παύση", aBack:"Πίσω", aList:"Εμφάνιση άλμπουμ",
+      aSaveTrack:"Αποθήκευση στον περιηγητή", aSaveAlbum:"Αποθήκευση άλμπουμ στον περιηγητή", aShuffleAlbum:"Τυχαία αναπαραγωγή άλμπουμ", aSheet:"Τώρα παίζει", aLock:"Οθόνη κλειδώματος",
+      aUnlock:"Ξεκλείδωμα: σύρετε δεξιά ή πατήστε Enter", slideTxt:"σύρετε για ξεκλείδωμα", dropTxt:"Αφήστε αρχεία ήχου ή φάκελο για προσθήκη"
+    }
+  };
+  function T(k, v){
+    var s = I18N[lang] && I18N[lang][k];
+    if(s == null) s = I18N.en[k];
+    if(s == null) return k;
+    if(v) for(var x in v) s = s.split('{' + x + '}').join(v[x]);
+    return s;
+  }
+  function PL(n, k){
+    var f = T(k).split('|');
+    if(lang === 'uk'){ var m = n % 10, h = n % 100; return (m === 1 && h !== 11) ? f[0] : (m >= 2 && m <= 4 && (h < 12 || h > 14)) ? f[1] : f[2]; }
+    return n === 1 ? f[0] : f[1];
+  }
+  function dA(x){ return x || T('unkArtist'); }
+  function dB(x){ return x || T('unkAlbum'); }
+  function applyI18n(){
+    document.documentElement.lang = lang;
+    document.querySelectorAll('[data-i18n]').forEach(function(el){ el.textContent = T(el.dataset.i18n); });
+    document.querySelectorAll('[data-i18n-html]').forEach(function(el){ el.innerHTML = T(el.dataset.i18nHtml); });
+    document.querySelectorAll('[data-i18n-aria]').forEach(function(el){ el.setAttribute('aria-label', T(el.dataset.i18nAria)); });
+  }
+
+  /* ---------- утиліти ---------- */
+  function esc(s){ return String(s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  function fmt(s){ if(!isFinite(s) || s < 0) s = 0; s = Math.floor(s); var m = Math.floor(s/60), r = s%60; return m + ':' + (r<10?'0':'') + r; }
+  function pl(n, a){ var m = n%10, h = n%100; return (m===1 && h!==11) ? a[0] : (m>=2 && m<=4 && (h<12 || h>14)) ? a[1] : a[2]; }
+  function byId(id){ return byIdMap.get(id); }
+  function curTrack(){ return cur==null ? null : byId(cur); }
+  var toastTimer;
+  function toast(msg){ toastEl.textContent = msg; toastEl.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(function(){ toastEl.classList.remove('show'); }, 2600); }
+  function setP(el){ var p = (el.value - el.min) / (el.max - el.min) * 100; el.style.setProperty('--p', p + '%'); }
+
+  /* ---------- обкладинки ---------- */
+  var DEFAULT_COVER = 'data:image/webp;base64,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';
+  function coverFor(t){
+    if(t.cover) return t.cover;
+    return DEFAULT_COVER;
+  }
+
+  /* ---------- теги й обкладинки: ID3 (mp3), FLAC, MP4/M4A ---------- */
+  function syncsafe(b,o){ return ((b[o]&0x7f)<<21)|((b[o+1]&0x7f)<<14)|((b[o+2]&0x7f)<<7)|(b[o+3]&0x7f); }
+  function be32(b,o){ return ((b[o]<<24)|(b[o+1]<<16)|(b[o+2]<<8)|b[o+3])>>>0; }
+  function le32(b,o){ return (b[o]|(b[o+1]<<8)|(b[o+2]<<16)|(b[o+3]<<24))>>>0; }
+  function ascii(b){ var s = ''; for(var i=0;i<b.length;i++) s += String.fromCharCode(b[i]); return s; }
+  function utf8(b){ return new TextDecoder('utf-8').decode(b).replace(/\u0000+$/,'').trim(); }
+  function imgUrl(bytes, mime){
+    if(!bytes || bytes.length < 100) return '';
+    if(!mime || mime.indexOf('/') < 0) mime = (bytes[0] === 0x89 && bytes[1] === 0x50) ? 'image/png' : 'image/jpeg';
+    var blob = new Blob([bytes], {type:mime}), url = URL.createObjectURL(blob);
+    blobOf.set(url, blob);
+    return url;
+  }
+  function decodeText(enc, b){
+    var s;
+    if(enc === 1 || enc === 2){
+      var le = true, o = 0;
+      if(enc === 1){
+        if(b[0]===0xFF && b[1]===0xFE){ le = true; o = 2; }
+        else if(b[0]===0xFE && b[1]===0xFF){ le = false; o = 2; }
+      } else le = false;
+      s = new TextDecoder(le ? 'utf-16le' : 'utf-16be').decode(b.subarray(o));
+    } else if(enc === 3){
+      s = new TextDecoder('utf-8').decode(b);
+    } else {
+      try { s = new TextDecoder('utf-8', {fatal:true}).decode(b); }
+      catch(e){ s = new TextDecoder('windows-1251').decode(b); }
+    }
+    return s.split('\u0000')[0].trim();
+  }
+
+  async function readId3(file, head){
+    var out = {};
+    var ver = head[3];
+    if(ver !== 2 && ver !== 3 && ver !== 4) return out;
+    var size = syncsafe(head, 6);
+    var buf = new Uint8Array(await file.slice(10, 10 + Math.min(size, 16*1024*1024)).arrayBuffer());
+    var p = 0, hl = (ver === 2) ? 6 : 10;
+    if(ver > 2 && (head[5] & 0x40)) p = (ver === 4) ? syncsafe(buf,0) : be32(buf,0) + 4;
+    while(p + hl <= buf.length){
+      if(buf[p] === 0) break;
+      var id, fsz, flag2 = 0;
+      if(ver === 2){
+        id = String.fromCharCode(buf[p],buf[p+1],buf[p+2]);
+        fsz = (buf[p+3] << 16) | (buf[p+4] << 8) | buf[p+5];
+      } else {
+        id = String.fromCharCode(buf[p],buf[p+1],buf[p+2],buf[p+3]);
+        fsz = (ver === 4) ? syncsafe(buf,p+4) : be32(buf,p+4);
+        flag2 = buf[p+9];
+      }
+      var st = p + hl, en = st + fsz;
+      if(fsz <= 0 || en > buf.length) break;
+      var data = buf.subarray(st, en);
+      if(ver === 4 && (flag2 & 1)) data = data.subarray(4);
+      if(id === 'TIT2' || id === 'TT2') out.title = decodeText(data[0], data.subarray(1));
+      else if(id === 'TPE1' || id === 'TP1') out.artist = decodeText(data[0], data.subarray(1));
+      else if(id === 'TALB' || id === 'TAL') out.album = decodeText(data[0], data.subarray(1));
+      else if(id === 'TRCK' || id === 'TRK') out.no = parseInt(decodeText(data[0], data.subarray(1)), 10) || 0;
+      else if(id === 'TYER' || id === 'TYE' || id === 'TDRC' || id === 'TDRL'){ var yv = parseInt(decodeText(data[0], data.subarray(1)).slice(0,4), 10); if(yv && !out.year) out.year = yv; }
+      else if((id === 'APIC' || id === 'PIC') && !out.cover){
+        var enc = data[0], q, mime = '';
+        if(id === 'PIC'){ mime = 'image/' + (ascii(data.subarray(1,4)).toUpperCase() === 'PNG' ? 'png' : 'jpeg'); q = 5; }
+        else { q = 1; while(q < data.length && data[q] !== 0) q++; mime = ascii(data.subarray(1,q)); q += 2; }
+        if(enc === 1 || enc === 2){ while(q+1 < data.length && !(data[q] === 0 && data[q+1] === 0)) q += 2; q += 2; }
+        else { while(q < data.length && data[q] !== 0) q++; q += 1; }
+        out.cover = imgUrl(data.subarray(q), mime);
+      }
+      p = en;
+    }
+    return out;
+  }
+
+  async function readFlac(file){
+    var out = {};
+    var buf = new Uint8Array(await file.slice(0, Math.min(file.size, 16*1024*1024)).arrayBuffer());
+    var p = 4;
+    while(p + 4 <= buf.length){
+      var hdr = buf[p], last = hdr & 0x80, type = hdr & 0x7f, len = (buf[p+1] << 16) | (buf[p+2] << 8) | buf[p+3];
+      p += 4;
+      if(p + len > buf.length) break;
+      var d = buf.subarray(p, p + len);
+      if(type === 4){
+        var o = 4 + le32(d,0), n = le32(d,o);
+        o += 4;
+        for(var i=0; i<n && o+4 <= d.length; i++){
+          var l = le32(d,o); o += 4;
+          var kv = utf8(d.subarray(o, o+l)); o += l;
+          var eq = kv.indexOf('=');
+          if(eq < 0) continue;
+          var k = kv.slice(0,eq).toUpperCase(), v = kv.slice(eq+1).trim();
+          if(k === 'TITLE') out.title = v;
+          else if(k === 'ARTIST') out.artist = v;
+          else if(k === 'ALBUM') out.album = v;
+          else if(k === 'TRACKNUMBER') out.no = parseInt(v,10) || 0;
+          else if(k === 'DATE' || k === 'YEAR'){ var y1 = parseInt(v.slice(0,4),10); if(y1 && !out.year) out.year = y1; }
+        }
+      } else if(type === 6 && !out.cover){
+        var ml = be32(d,4), mime = ascii(d.subarray(8, 8+ml)), dl = be32(d, 8+ml), o2 = 12 + ml + dl + 16, il = be32(d,o2);
+        out.cover = imgUrl(d.subarray(o2+4, o2+4+il), mime);
+      }
+      p += len;
+      if(last) break;
+    }
+    return out;
+  }
+
+  function mp4Data(b, s, e){
+    while(s + 16 <= e){
+      var sz = be32(b,s);
+      if(sz < 16 || s + sz > e) break;
+      if(b[s+4] === 0x64 && b[s+5] === 0x61 && b[s+6] === 0x74 && b[s+7] === 0x61) return {type: be32(b,s+8) & 0xFFFFFF, bytes: b.subarray(s+16, s+sz)};
+      s += sz;
+    }
+    return null;
+  }
+  function mp4Walk(b, s, e, out){
+    while(s + 8 <= e){
+      var sz = be32(b,s), t = String.fromCharCode(b[s+4],b[s+5],b[s+6],b[s+7]);
+      if(sz < 8 || s + sz > e) break;
+      var cs = s + 8, ce = s + sz;
+      if(t === 'udta' || t === 'ilst') mp4Walk(b, cs, ce, out);
+      else if(t === 'meta') mp4Walk(b, cs + 4, ce, out);
+      else if(t === '©nam' || t === '©ART' || t === 'aART' || t === '©alb' || t === 'covr' || t === 'trkn' || t === '©day'){
+        var dt = mp4Data(b, cs, ce);
+        if(dt){
+          if(t === '©nam') out.title = utf8(dt.bytes);
+          else if(t === '©ART') out.artist = utf8(dt.bytes);
+          else if(t === 'aART'){ if(!out.artist) out.artist = utf8(dt.bytes); }
+          else if(t === '©alb') out.album = utf8(dt.bytes);
+          else if(t === 'trkn') out.no = (dt.bytes[2] << 8) | dt.bytes[3];
+          else if(t === '©day'){ var y2 = parseInt(utf8(dt.bytes).slice(0,4),10); if(y2) out.year = y2; }
+          else if(t === 'covr' && !out.cover) out.cover = imgUrl(dt.bytes, dt.type === 14 ? 'image/png' : dt.type === 13 ? 'image/jpeg' : '');
+        }
+      }
+      s += sz;
+    }
+  }
+  async function readMp4(file){
+    var out = {}, off = 0, size = file.size;
+    while(off + 8 <= size){
+      var h = new DataView(await file.slice(off, off + 16).arrayBuffer());
+      var sz = h.getUint32(0), type = String.fromCharCode(h.getUint8(4),h.getUint8(5),h.getUint8(6),h.getUint8(7)), hl = 8;
+      if(sz === 1 && h.byteLength >= 16){ sz = h.getUint32(8) * 4294967296 + h.getUint32(12); hl = 16; }
+      else if(sz === 0) sz = size - off;
+      if(sz < 8) break;
+      if(type === 'moov'){
+        if(sz > 48*1024*1024) break;
+        var buf = new Uint8Array(await file.slice(off + hl, off + sz).arrayBuffer());
+        mp4Walk(buf, 0, buf.length, out);
+        break;
+      }
+      off += sz;
+    }
+    return out;
+  }
+
+  async function readTags(file){
+    try{
+      var h = new Uint8Array(await file.slice(0,12).arrayBuffer());
+      if(h[0] === 0x49 && h[1] === 0x44 && h[2] === 0x33) return await readId3(file, h);
+      if(h[0] === 0x66 && h[1] === 0x4C && h[2] === 0x61 && h[3] === 0x43) return await readFlac(file);
+      if(h[4] === 0x66 && h[5] === 0x74 && h[6] === 0x79 && h[7] === 0x70) return await readMp4(file);
+    }catch(e){}
+    return {};
+  }
+
+  /* Картинка, яку додали разом з аудіо: те саме ім'я, cover/folder/front або єдина картинка */
+  var imgUrls = new Map();
+  function pickImage(imgs, f){
+    if(!imgs.length) return '';
+    var base = f.name.replace(/\.[^.]+$/, '').toLowerCase();
+    var pick = imgs.find(function(i){ return i.name.replace(/\.[^.]+$/, '').toLowerCase() === base; })
+      || imgs.find(function(i){ return /^(cover|folder|front|albumart|album)/i.test(i.name); })
+      || (imgs.length === 1 ? imgs[0] : null);
+    if(!pick) return '';
+    if(!imgUrls.has(pick)){ var pu = URL.createObjectURL(pick); imgUrls.set(pick, pu); blobOf.set(pu, pick); }
+    return imgUrls.get(pick);
+  }
+
+  /* ---------- бібліотека ---------- */
+  function addTrack(o){
+    var t = {id: nextId++, title:o.title, artist:o.artist || '', album:o.album || '',
+      no:o.no || 0, year:o.year || 0, duration:o.duration || 0, url:o.url, cover:o.cover || '', key:o.key || '',
+      file:o.file || null, fileName:o.fileName || '', saved:!!o.saved};
+    tracks.push(t); byIdMap.set(t.id, t);
+    return t;
+  }
+  function updateDur(t){
+    var els = screenEl.querySelectorAll('[data-id="' + t.id + '"] .d');
+    for(var i=0;i<els.length;i++) els[i].textContent = t.duration ? fmt(t.duration) : '';
+  }
+  var softT = null;
+  function softRender(){
+    clearTimeout(softT);
+    softT = setTimeout(function(){ var a = document.activeElement; if(a && a.id === 'q') return; render(); }, 250);
+  }
+  function probe(t){
+    var a = new Audio(); a.preload = 'metadata';
+    a.onloadedmetadata = function(){
+      if(isFinite(a.duration)){ t.duration = a.duration; updateDur(t); softRender(); }
+      a.removeAttribute('src');
+    };
+    a.src = t.url;
+  }
+  /* папки: шлях файлу з вибору папки або з перетягування */
+  function relPath(f){ return f.webkitRelativePath || f._path || f.name; }
+  function dirOf(f){ var p = relPath(f), i = p.lastIndexOf('/'); return i < 0 ? '' : p.slice(0, i); }
+  function folderName(f){ var d = dirOf(f); return d ? d.slice(d.lastIndexOf('/') + 1) : ''; }
+  function readAllEntries(reader){
+    return new Promise(function(res){
+      var out = [];
+      (function next(){ reader.readEntries(function(b){ if(!b.length) res(out); else { out = out.concat(Array.prototype.slice.call(b)); next(); } }, function(){ res(out); }); })();
+    });
+  }
+  async function walkEntry(en, path, out){
+    if(en.isFile){
+      await new Promise(function(res){ en.file(function(file){ try{ file._path = path + file.name; }catch(e){} out.push(file); res(); }, res); });
+    } else if(en.isDirectory){
+      var list = await readAllEntries(en.createReader());
+      for(var i=0;i<list.length;i++) await walkEntry(list[i], path + en.name + '/', out);
+    }
+  }
+  async function filesFromDrop(dt){
+    var items = dt.items ? Array.prototype.slice.call(dt.items) : [];
+    var entries = items.map(function(it){ return it.webkitGetAsEntry ? it.webkitGetAsEntry() : null; }).filter(Boolean);
+    if(!entries.length) return Array.prototype.slice.call(dt.files);
+    var out = [];
+    for(var i=0;i<entries.length;i++) await walkEntry(entries[i], '', out);
+    return out;
+  }
+  async function addFiles(files){
+    var all = Array.prototype.slice.call(files);
+    var arr = all.filter(function(f){ return /^audio\//.test(f.type) || /\.(mp3|m4a|aac|flac|ogg|opus|wav)$/i.test(f.name); });
+    var imgs = all.filter(function(f){ return /^image\//.test(f.type) || /\.(jpe?g|png|webp)$/i.test(f.name); });
+    if(!arr.length){ toast(T('tNoAudio')); return; }
+    var pcoll = new Intl.Collator(undefined, {numeric:true, sensitivity:'base'});
+    arr.sort(function(a, b){ return pcoll.compare(relPath(a), relPath(b)); });
+    var added = 0;
+    for(var i=0;i<arr.length;i++){
+      var f = arr[i], key = f.name + '|' + f.size;
+      if(tracks.some(function(t){ return t.key === key; })) continue;
+      var tags = await readTags(f);
+      var dir = dirOf(f);
+      var coverUrl = tags.cover || pickImage(dir ? imgs.filter(function(i){ return dirOf(i) === dir; }) : imgs, f);
+      var base = f.name.replace(/\.[^.]+$/, ''), title = tags.title, artist = tags.artist;
+      if(!title){
+        var m = base.split(' - ');
+        if(m.length === 2 && !artist){ artist = m[0].trim(); title = m[1].trim(); } else title = base;
+      }
+      var album = tags.album || folderName(f);
+      var t = addTrack({title:title, artist:artist, album:album, no:tags.no, year:tags.year, cover:coverUrl,
+        url:URL.createObjectURL(f), key:key, file:f, fileName:f.name});
+      probe(t); added++;
+    }
+    if(cur == null && tracks.length){ queue = tracks.map(function(t){ return t.id; }); cur = queue[0]; rebuildOrder(); setTrack(cur); }
+    render();
+    if(added) toast(T('tAdded', {n:added, w:PL(added, 'wTrack')}));
+    else toast(T('tDupe'));
+  }
+
+  /* ---------- збереження в браузері (IndexedDB): хмарка біля треку ---------- */
+  var idb = null;
+  function idbReq(r){ return new Promise(function(res, rej){ r.onsuccess = function(){ res(r.result); }; r.onerror = function(){ rej(r.error); }; }); }
+  function idbOpen(){
+    if(idb) return Promise.resolve(idb);
+    return new Promise(function(res, rej){
+      var req;
+      try{ req = indexedDB.open('ios7player', 1); }catch(e){ return rej(e); }
+      req.onupgradeneeded = function(){ req.result.createObjectStore('tracks', {keyPath:'key'}); };
+      req.onsuccess = function(){ idb = req.result; res(idb); };
+      req.onerror = function(){ rej(req.error); };
+      req.onblocked = function(){ rej(new Error('blocked')); };
+    });
+  }
+  function store(mode){ return idb.transaction('tracks', mode).objectStore('tracks'); }
+  async function idbAll(){ await idbOpen(); return idbReq(store('readonly').getAll()); }
+  async function idbPut(rec){ await idbOpen(); return idbReq(store('readwrite').put(rec)); }
+  async function idbClear(){ await idbOpen(); return idbReq(store('readwrite').clear()); }
+  async function saveTrack(t){
+    if(t.saved || !t.file) return true;
+    try{
+      await idbPut({key:t.key, name:t.fileName, blob:t.file, title:t.title, artist:t.artist, album:t.album, no:t.no, year:t.year,
+        duration:t.duration, cover:(t.cover && blobOf.get(t.cover)) || null});
+      t.saved = true; return true;
+    }catch(e){ return false; }
+  }
+  async function doSave(list){
+    list = list.filter(function(t){ return t && !t.saved && t.file; });
+    if(!list.length) return;
+    var ok = 0;
+    for(var i=0;i<list.length;i++){ if(await saveTrack(list[i])) ok++; }
+    render();
+    toast(ok ? T('tSaved', {n:ok}) : T('tSaveFail'));
+  }
+  function removeTracks(pred){
+    var gone = tracks.filter(pred);
+    if(!gone.length) return;
+    tracks = tracks.filter(function(t){ return !pred(t); });
+    gone.forEach(function(t){ byIdMap.delete(t.id); });
+    queue = queue.filter(function(id){ return byIdMap.has(id); });
+    if(cur != null && !byIdMap.has(cur)){
+      audio.pause(); cur = null;
+      if(tracks.length){ queue = tracks.map(function(t){ return t.id; }); cur = queue[0]; rebuildOrder(); setTrack(cur); }
+    } else rebuildOrder();
+    updateNow();
+  }
+  async function restoreSaved(){
+    try{
+      var rows = await idbAll();
+      if(!rows || !rows.length) return;
+      removeTracks(function(t){ return /^demo-/.test(t.key); });
+      rows.forEach(function(r){
+        var cover = '';
+        if(r.cover){ cover = URL.createObjectURL(r.cover); blobOf.set(cover, r.cover); }
+        addTrack({title:r.title, artist:(r.artist === 'Невідомий виконавець' ? '' : r.artist), album:(r.album === 'Невідомий альбом' ? '' : r.album), no:r.no, year:r.year, duration:r.duration,
+          url:URL.createObjectURL(r.blob), cover:cover, key:r.key, file:r.blob, fileName:r.name, saved:true});
+      });
+      if(cur == null && tracks.length){ queue = tracks.map(function(t){ return t.id; }); cur = queue[0]; rebuildOrder(); setTrack(cur); }
+      render();
+    }catch(e){}
+  }
+  async function clearSaved(){
+    try{ await idbClear(); }catch(e){ toast(T('tClearFail')); return; }
+    tracks.forEach(function(t){ if(t.file) t.saved = false; });
+    render(); toast(T('tCleared'));
+  }
+
+  /* ---------- групування: альбоми, виконавці ---------- */
+  function albumKey(t){ return encodeURIComponent(t.album) + '|' + encodeURIComponent(t.artist); }
+  function groupAlbums(){
+    var m = new Map();
+    tracks.forEach(function(t){
+      var k = albumKey(t), a = m.get(k);
+      if(!a){ a = {key:k, album:t.album, artist:t.artist, tracks:[], year:0, dur:0, cover:''}; m.set(k, a); }
+      a.tracks.push(t);
+    });
+    var out = Array.from(m.values());
+    out.forEach(function(a){
+      a.tracks.sort(function(x,y){ return ((x.no || 999) - (y.no || 999)) || coll.compare(x.title, y.title); });
+      a.tracks.forEach(function(t){ if(!a.cover && t.cover) a.cover = t.cover; if(!a.year && t.year) a.year = t.year; a.dur += t.duration || 0; });
+      if(!a.cover) a.cover = coverFor(a.tracks[0]);
+    });
+    out.sort(function(x,y){ return coll.compare(x.album, y.album) || coll.compare(x.artist, y.artist); });
+    return out;
+  }
+  function findAlbum(key){ return groupAlbums().filter(function(a){ return a.key === key; })[0] || null; }
+  function groupArtists(){
+    var m = new Map();
+    groupAlbums().forEach(function(a){
+      var r = m.get(a.artist);
+      if(!r){ r = {name:a.artist, albums:[], songs:0}; m.set(a.artist, r); }
+      r.albums.push(a); r.songs += a.tracks.length;
+    });
+    var out = Array.from(m.values());
+    out.sort(function(x,y){ return coll.compare(x.name, y.name); });
+    return out;
+  }
+  function findArtist(name){ return groupArtists().filter(function(a){ return a.name === name; })[0] || null; }
+  function hueOf(str){ var x = 0; for(var i=0;i<str.length;i++) x = (x * 31 + str.charCodeAt(i)) >>> 0; return x % 360; }
+  function songsWord(n){ return n + ' ' + PL(n, 'wSong'); }
+
+  /* ---------- розмітка екранів ---------- */
+  var ICON_CLOUD = '<svg viewBox="0 0 26 26" aria-hidden="true"><path class="cl-o" d="M7.5 17.5C4.5 17.5 3 15.5 3 13.2 3 11 4.6 9.4 6.8 9.2 7.4 6.2 9.8 4.2 12.8 4.2 15.6 4.2 17.8 6 18.5 8.5 21 8.6 23 10.4 23 13 23 15.8 21 17.5 18.5 17.5Z"/><path class="cl-a" d="M13 12.5V23.2M9.4 19.7L13 23.3l3.6-3.6"/></svg>';
+  var ICON_SHUF = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 6.5h3.4c4.4 0 5.6 11 10.6 11H21M2 17.5h3.4c1.3 0 2.4-.5 3.2-1.2M21 6.5h-5c-1.7 0-2.8.7-3.7 1.6M18.6 3.8L21 6.5l-2.4 2.7M18.6 14.8L21 17.5l-2.4 2.7"/></svg>';
+  var CHEV_R = '<svg class="chev" viewBox="0 0 8 14" aria-hidden="true"><path d="M1.2 1.2L6.8 7l-5.6 5.8"/></svg>';
+  var CHEV_L = '<svg viewBox="0 0 12 21" aria-hidden="true"><path d="M10 2L2.5 10.5 10 19"/></svg>';
+  var EQ = '<span class="eq %c" aria-hidden="true"><i></i><i></i><i></i></span>';
+  function dl(t){
+    return (!t.saved && t.file)
+      ? '<button class="cloud" type="button" data-act="save" data-id="' + t.id + '" aria-label="' + T('aSaveTrack') + '">' + ICON_CLOUD + '</button>'
+      : '<span class="cloudgap"></span>';
+  }
+  function durHtml(t){ return '<span class="d">' + (t.duration ? fmt(t.duration) : '') + '</span>'; }
+
+  function albumHtml(a){
+    var n = a.tracks.length, mins = a.dur ? Math.max(1, Math.round(a.dur / 60)) : 0;
+    var unsaved = a.tracks.some(function(t){ return !t.saved && t.file; });
+    var meta = '<b>' + n + '</b> ' + PL(n, 'wSong') + (mins ? ', <b>' + mins + '</b> ' + T('min') : '');
+    var h = '<div class="ahead"><img class="acover" alt="" src="' + a.cover + '"><div class="atitle">' + esc(dB(a.album)) + '</div>' +
+      '<div class="ameta">' + meta + '</div><div class="ayear">' + (a.year ? a.year : esc(dA(a.artist))) + '</div>' +
+      (unsaved ? '<button class="abtn cl" type="button" data-act="saveall" data-key="' + a.key + '" aria-label="' + T('aSaveAlbum') + '">' + ICON_CLOUD + '</button>' : '') +
+      '<button class="abtn sh" type="button" data-act="shuffle" data-key="' + a.key + '" aria-label="' + T('aShuffleAlbum') + '">' + ICON_SHUF + '</button></div>';
+    a.tracks.forEach(function(t, i){
+      h += '<div class="trow" role="button" tabindex="0" data-act="play" data-id="' + t.id + '"><span class="tnum">' + (i + 1) + '</span>' +
+        EQ.replace('%c','l') + '<span class="tt">' + esc(t.title) + '</span>' + dl(t) + durHtml(t) + '</div>';
+    });
+    return h;
+  }
+  function albumsHtml(){
+    var list = groupAlbums();
+    if(!list.length) return emptyHtml();
+    return '<div class="grid">' + list.map(function(a){
+      return '<button class="gcell" type="button" data-act="album" data-key="' + a.key + '"><img alt="" src="' + a.cover + '">' +
+        '<span class="gname">' + esc(dB(a.album)) + '</span><span class="gart">' + esc(dA(a.artist)) + '</span></button>';
+    }).join('') + '</div>';
+  }
+  function artistsHtml(){
+    var list = groupArtists();
+    if(!list.length) return emptyHtml();
+    return list.map(function(r){
+      var na = r.albums.length;
+      return '<div class="lrow" role="button" tabindex="0" data-act="artist" data-name="' + esc(r.name) + '"><span class="lt"><span class="t">' + esc(dA(r.name)) +
+        '</span><span class="s">' + na + ' ' + PL(na, 'wAlbum') + ', ' + songsWord(r.songs) + '</span></span>' + CHEV_R + '</div>';
+    }).join('');
+  }
+  function artistHtml(r){
+    return r.albums.map(function(a){
+      return '<div class="lrow big" role="button" tabindex="0" data-act="album" data-key="' + a.key + '"><img class="lthumb" alt="" src="' + a.cover + '">' +
+        '<span class="lt"><span class="t">' + esc(dB(a.album)) + '</span><span class="s">' + songsWord(a.tracks.length) + (a.year ? ' · ' + a.year : '') + '</span></span>' + CHEV_R + '</div>';
+    }).join('');
+  }
+  function computeVis(){
+    var q = query.trim().toLowerCase();
+    vis = tracks.filter(function(t){ return !q || (t.title + ' ' + t.artist + ' ' + t.album).toLowerCase().indexOf(q) >= 0; })
+      .sort(function(x,y){ return coll.compare(x.title, y.title); });
+  }
+  function songListHtml(){
+    computeVis();
+    if(!vis.length) return '<div class="empty">' + T('noResults') + '</div>';
+    var sec = 0;
+    tracks.forEach(function(t){ sec += t.duration || 0; });
+    var mins = Math.round(sec / 60);
+    return vis.map(function(t){
+      return '<div class="trow two" role="button" tabindex="0" data-act="play" data-id="' + t.id + '"><span class="tt2"><span class="t">' + esc(t.title) +
+        '</span><span class="s">' + esc(dA(t.artist)) + ' — ' + esc(dB(t.album)) + '</span></span>' + EQ.replace('%c','r') + dl(t) + durHtml(t) + '</div>';
+    }).join('') + '<div class="foot">' + songsWord(tracks.length) + (mins ? ', ' + mins + ' ' + T('min') : '') + '</div>';
+  }
+  function songsHtml(){
+    return '<div class="searchwrap"><label class="search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21"/></svg>' +
+      '<input id="q" type="search" placeholder="' + T('search') + '" autocomplete="off" aria-label="' + T('searchAria') + '" value="' + esc(query) + '"></label></div><div id="songList">' + songListHtml() + '</div>';
+  }
+  function emptyHtml(){
+    return '<div class="empty"><b>' + T('emptyTitle') + '</b>' + T('emptyText') + '<br><button class="pill" type="button" data-act="add">' + T('emptyBtn') + '</button></div>';
+  }
+  var STICKER = 'data:image/webp;base64,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';
+  /* ---------- сніжочок: 3 розміри, повільно, сам вмикається з 1 грудня по 1 січня ---------- */
+  var snowPref = null;
+  try{ var sp_ = localStorage.getItem('ios7player.snow'); if(sp_ === '1' || sp_ === '0') snowPref = sp_ === '1'; }catch(e){}
+  function snowSeason(){ var d = new Date(); return d.getMonth() === 11 || (d.getMonth() === 0 && d.getDate() === 1); }
+  function snowOn(){ return snowPref === null ? snowSeason() : snowPref; }
+  var snowEl = $('#snow'), snowCtx = null, snowFl = [], snowRun = false, snowT = 0, snowW = 0, snowH = 0, snowK = 0;
+  var SNOW_R = [1.5, 2.5, 3.8], SNOW_V = [13, 20, 30];
+  function snowMake(top){
+    var z = Math.random() < .5 ? 0 : (Math.random() < .6 ? 1 : 2);
+    return {x:Math.random() * snowW, y:top ? -6 - Math.random() * 30 : Math.random() * snowH, z:z, r:SNOW_R[z], v:SNOW_V[z] * (.8 + Math.random() * .5),
+            ph:Math.random() * 6.28, sw:6 + Math.random() * 10, fq:.4 + Math.random() * .5, a:.6 + z * .13};
+  }
+  /* піксельні сніжинки: 3 спрайти (3x3, 5x5, 9x9), біла + синювата піксельна тінь */
+  var SNOW_PIX = [
+    ['.X.','XXX','.X.'],
+    ['X.X.X','.XXX.','XXXXX','.XXX.','X.X.X'],
+    ['....X....','.X..X..X.','..X.X.X..','...XXX...','XXXXXXXXX','...XXX...','..X.X.X..','.X..X..X.','....X....']
+  ];
+  var snowSp = [], snowP = 0;
+  function snowSpr(P){
+    snowP = P; snowSp = [];
+    SNOW_PIX.forEach(function(rows){
+      var n = rows.length, c = document.createElement('canvas'); c.width = c.height = (n + 1) * P;
+      var g = c.getContext('2d'), y, x;
+      g.fillStyle = 'rgba(96,122,168,.55)';
+      for(y = 0; y < n; y++) for(x = 0; x < n; x++) if(rows[y].charAt(x) === 'X') g.fillRect((x + 1) * P, (y + 1) * P, P, P);
+      g.fillStyle = '#fff';
+      for(y = 0; y < n; y++) for(x = 0; x < n; x++) if(rows[y].charAt(x) === 'X') g.fillRect(x * P, y * P, P, P);
+      snowSp.push(c);
+    });
+  }
+  function snowFrame(t){
+    if(!snowRun) return;
+    requestAnimationFrame(snowFrame);
+    var dt = Math.min(.05, (t - snowT) / 1000 || .016); snowT = t;
+    var W = app.offsetWidth, H = app.offsetHeight, k = Math.max(1, scaleK * (window.devicePixelRatio || 1));
+    if(W !== snowW || H !== snowH || Math.abs(k - snowK) > .05){
+      snowW = W; snowH = H; snowK = k;
+      snowEl.width = Math.round(W * k); snowEl.height = Math.round(H * k);
+      var n = Math.max(40, Math.min(110, Math.round(W * H / 3300)));
+      snowFl = []; for(var i = 0; i < n; i++) snowFl.push(snowMake(false));
+    }
+    var P = Math.max(2, Math.round(k * 1.5));
+    if(P !== snowP) snowSpr(P);
+    var g = snowCtx; g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, snowEl.width, snowEl.height);
+    for(var j = 0; j < snowFl.length; j++){
+      var f = snowFl[j];
+      f.y += f.v * dt; f.ph += f.fq * dt * 6.28;
+      if(f.y > H + 14){ snowFl[j] = snowMake(true); continue; }
+      var sp = snowSp[f.z];
+      g.globalAlpha = f.a;
+      g.drawImage(sp, Math.round((f.x + Math.sin(f.ph) * f.sw) * k / P) * P, Math.round(f.y * k / P) * P);
+    }
+    g.globalAlpha = 1;
+  }
+  function snowApply(){
+    var calm = false; try{ calm = matchMedia('(prefers-reduced-motion:reduce)').matches && snowPref !== true; }catch(e){}
+    var on = snowOn() && !calm;
+    snowEl.classList.toggle('on', on);
+    if(on && !snowRun){ snowCtx = snowCtx || snowEl.getContext('2d'); snowRun = true; snowW = 0; snowT = performance.now(); requestAnimationFrame(snowFrame); }
+    else if(!on){ snowRun = false; }
+  }
+  snowApply();
+  function authorsHtml(){
+    function r(n, sub, note){ return '<div class="mrow st"><span>' + esc(n) + '</span>' + (sub ? '<span class="msub">' + esc(sub) + (note ? '<small>' + esc(note) + '</small>' : '') + '</span>' : '') + '</div>'; }
+    return '<div class="more"><div class="gh"></div><div class="gtab">' + r(T('aKitty'), '@boykisserua', 'Telegram, TikTok') + r('Claude', 'Anthropic') + '</div><div class="amsg shimtxt">' + esc(T('aMsg')) + '</div><button type="button" class="astkb" data-act="stk" aria-label="' + esc(T('aMsg2')) + '"><img class="astk" alt="" src="' + STICKER + '"></button><div class="stkmsg" id="stkMsg">' + esc(T('aMsg2')) + '</div></div>';
+  }
+  function moreHtml(){
+    var saved = tracks.filter(function(t){ return t.saved && t.file; }).length;
+    var unsaved = tracks.filter(function(t){ return !t.saved && t.file; }).length;
+    function row(act, label, extra, cls){ return '<div class="mrow ' + (cls || '') + '" role="button" tabindex="0" data-act="' + act + '"><span>' + esc(label) + '</span>' + (extra || '') + '</div>'; }
+    function seg(items, act, now, aria){
+      return '<div class="mrow"><div class="skseg" role="group" aria-label="' + esc(aria) + '">' + items.map(function(x){
+        return '<button type="button" data-act="' + act + '" data-v="' + x[0] + '"' + (now === x[0] ? ' class="on"' : '') + '>' + esc(x[1]) + '</button>';
+      }).join('') + '</div></div>';
+    }
+    return '<div class="more">' +
+      '<div class="gh">' + esc(T('hMusic')) + '</div><div class="gtab">' + row('add', T('addMusic'), CHEV_R) + row('adddir', T('addFolder'), CHEV_R) +
+        row('saveall', T('saveAll') + (unsaved ? ' (' + unsaved + ')' : ''), '', unsaved ? '' : 'dim') + '</div>' +
+      '<div class="gh">' + esc(T('hScreen')) + '</div><div class="gtab">' + row('lock', T('lockScreen'), CHEV_R) + row('desk', T('deskMode') + (deskPref ? '  ✓' : ''), CHEV_R) + row('adapt', T('adaptMode') + (adaptPref ? '  ✓' : ''), CHEV_R) + row('snow', T('snowMode') + (snowOn() ? '  ✓' : ''), CHEV_R) + '</div>' +
+      '<div class="gh">' + esc(T('hAuto')) + '</div><div class="gtab">' + seg([['30', T('al30')], ['60', T('al60')], ['300', T('al300')], ['0', T('al0')]], 'autolock', String(autoSec), T('hAuto')) + '</div>' +
+      '<div class="gh">' + esc(T('hTheme')) + '</div><div class="gtab">' + seg([['light', T('themeLight')], ['dark', T('themeDark')], ['auto', T('themeAuto')]], 'skin', skin, T('hTheme')) + '</div>' +
+      '<div class="gh">' + esc(T('hLang')) + '</div><div class="gtab">' + seg([['en', LANGS.en], ['uk', LANGS.uk], ['el', LANGS.el]], 'lang', lang, T('hLang')) + '</div>' +
+      '<div class="gh"></div><div class="gtab">' + row('authors', T('authors'), CHEV_R) + '</div>' +
+      '<div class="gh">' + esc(T('hStorage')) + '</div><div class="gtab">' + row('clear', T('clearStorage'), '', saved ? 'red' : 'dim') + '</div>' +
+      '<div class="gf">' + esc(T('storageNote', {songs: songsWord(saved)})) + '</div></div>';
+  }
+
+  /* ---------- навігація: вкладки і стек екранів ---------- */
+  var TKEYS = {artists:'tabArtists', albums:'tabAlbums', songs:'tabSongs', more:'tabMore'};
+  function tabTitle(t){ return T(TKEYS[t]); }
+  var stacks = {artists:[], albums:[], songs:[], more:[]};
+  var tab = 'more', lastKey = '', scrollMem = {}, skin = 'light';
+  function cv(){ var st = stacks[tab]; return st.length ? st[st.length - 1] : null; }
+  function viewKey(){ return tab + '/' + stacks[tab].map(function(v){ return v.kind + ':' + v.key; }).join('/'); }
+  function viewTitle(v){
+    if(!v) return tabTitle(tab);
+    if(v.kind === 'authors') return T('authors');
+    if(v.kind === 'artist') return dA(v.key);
+    var a = findAlbum(v.key); return a ? dB(a.album) : '';
+  }
+  function render(anim){
+    var prevTop = scrollEl.scrollTop, v = cv(), html = '', title = '', root = !v, back = '';
+    if(v && v.kind === 'authors'){ title = T('authors'); html = authorsHtml(); }
+    else if(v && v.kind === 'album'){
+      var a = findAlbum(v.key);
+      if(!a){ stacks[tab].pop(); return render(anim); }
+      title = dB(a.album); html = albumHtml(a);
+    } else if(v && v.kind === 'artist'){
+      var r = findArtist(v.key);
+      if(!r){ stacks[tab].pop(); return render(anim); }
+      title = dA(r.name); html = artistHtml(r);
+    } else {
+      title = tabTitle(tab);
+      html = tab === 'artists' ? artistsHtml() : tab === 'albums' ? albumsHtml() : tab === 'songs' ? songsHtml() : moreHtml();
+    }
+    if(!root){ var st = stacks[tab]; back = st.length > 1 ? viewTitle(st[st.length - 2]) : tabTitle(tab); }
+    var key = viewKey();
+    if(lastKey && key !== lastKey) scrollMem[lastKey] = prevTop;
+    screenEl.innerHTML = html;
+    if(key !== lastKey) scrollEl.scrollTop = scrollMem[key] || 0;
+    lastKey = key;
+    scrollEl.classList.toggle('grp', tab === 'more' && (root || (v && v.kind === 'authors')));
+    var nl = $('#navLeft');
+    if(!root){ nl.className = 'nl'; nl.dataset.act = 'back'; nl.setAttribute('aria-label', T('backTo', {t:back})); nl.innerHTML = CHEV_L + '<span>' + esc(back) + '</span>'; }
+    else if(tab === 'songs' || tab === 'albums' || tab === 'artists'){ nl.className = 'nl add'; nl.dataset.act = 'add'; nl.removeAttribute('aria-label'); nl.innerHTML = '<span>' + esc(T('add')) + '</span>'; }
+    else { nl.className = 'nl inv'; nl.dataset.act = ''; nl.removeAttribute('aria-label'); nl.innerHTML = ''; }
+    $('#navTitle').textContent = title;
+    document.querySelectorAll('.tab').forEach(function(b){
+      var on = b.dataset.tab === tab; b.classList.toggle('sel', on); b.setAttribute('aria-current', on ? 'page' : 'false');
+    });
+    $('#noc').classList.toggle('on', root && tab !== 'more' && !tracks.length);
+    screenEl.className = '';
+    if(anim){ void screenEl.offsetWidth; screenEl.className = anim; }
+    markPlaying();
+  }
+  function markPlaying(){
+    var on = screenEl.querySelectorAll('.trow.on');
+    for(var i=0;i<on.length;i++) on[i].classList.remove('on');
+    if(cur != null){
+      var els = screenEl.querySelectorAll('.trow[data-id="' + cur + '"]');
+      for(var j=0;j<els.length;j++) els[j].classList.add('on');
+    }
+  }
+  function updateNow(){ $('#navNow').classList.toggle('inv', cur == null); }
+  function pushView(v){ stacks[tab].push(v); render('push'); }
+  function popView(){ if(stacks[tab].length){ stacks[tab].pop(); render('pop'); } }
+  function setTab(t){
+    if(t === tab){
+      if(stacks[t].length){ stacks[t] = []; render('pop'); } else scrollEl.scrollTop = 0;
+      return;
+    }
+    tab = t; render();
+  }
+  function applySkin(v){
+    skin = v;
+    var r = document.documentElement;
+    if(v === 'auto') r.removeAttribute('data-skin'); else r.setAttribute('data-skin', v);
+    try{ localStorage.setItem('ios7player.skin', v); }catch(e){}
+  }
+  function setShuffle(on){
+    shuffle = on; rebuildOrder(); updateModes();
+  }
+  function ctxList(){
+    var v = cv();
+    if(v && v.kind === 'album'){ var a = findAlbum(v.key); return a ? a.tracks : []; }
+    computeVis(); return vis;
+  }
+  screenEl.addEventListener('click', function(e){
+    var el = e.target.closest('[data-act]'); if(!el) return;
+    var act = el.dataset.act, a;
+    if(act === 'play'){
+      var id = +el.dataset.id;
+      if(id === cur) toggle(); else playTrack(id, ctxList());
+    } else if(act === 'save'){ doSave([byId(+el.dataset.id)]); }
+    else if(act === 'saveall'){ a = el.dataset.key ? findAlbum(el.dataset.key) : null; doSave(a ? a.tracks : tracks); }
+    else if(act === 'shuffle'){
+      a = findAlbum(el.dataset.key); if(!a || !a.tracks.length) return;
+      setShuffle(true); playTrack(a.tracks[Math.floor(Math.random() * a.tracks.length)].id, a.tracks);
+    }
+    else if(act === 'album') pushView({kind:'album', key:el.dataset.key});
+    else if(act === 'artist') pushView({kind:'artist', key:el.dataset.name});
+    else if(act === 'add') $('#file').click();
+    else if(act === 'adddir') $('#dir').click();
+    else if(act === 'lock') lockScreen();
+    else if(act === 'desk') toggleDesk();
+    else if(act === 'snow'){ snowPref = !snowOn(); try{ localStorage.setItem('ios7player.snow', snowPref ? '1' : '0'); }catch(e){} snowApply(); render(); }
+    else if(act === 'authors') pushView({kind:'authors', key:'a'});
+    else if(act === 'stk'){ var m = $('#stkMsg'); if(m) m.classList.toggle('on'); }
+    else if(act === 'adapt'){ adaptPref = !adaptPref; try{ localStorage.setItem('ios7player.adapt', adaptPref ? '1' : '0'); }catch(e){} fitApp(); render(); }
+    else if(act === 'skin'){ applySkin(el.dataset.v); render(); }
+    else if(act === 'lang'){ setLang(el.dataset.v); }
+    else if(act === 'autolock'){ autoSec = +el.dataset.v; try{ localStorage.setItem('ios7player.auto', String(autoSec)); }catch(e){} lastAct = Date.now(); render(); }
+    else if(act === 'clear'){ clearSaved(); }
+  });
+  screenEl.addEventListener('keydown', function(e){
+    if((e.key === 'Enter' || e.key === ' ') && e.target.getAttribute && e.target.getAttribute('role') === 'button'){ e.preventDefault(); e.target.click(); }
+  });
+  screenEl.addEventListener('input', function(e){
+    if(e.target.id !== 'q') return;
+    query = e.target.value; $('#songList').innerHTML = songListHtml(); markPlaying();
+  });
+  $('#navLeft').addEventListener('click', function(){
+    var act = this.dataset.act;
+    if(act === 'back') popView(); else if(act === 'add') $('#file').click();
+  });
+  $('#navNow').addEventListener('click', function(){ openSheet(); });
+  $('#tabbar').addEventListener('click', function(e){ var b = e.target.closest('.tab'); if(b) setTab(b.dataset.tab); });
+  function clockStr(){ return new Date().toLocaleTimeString(LOC[lang] || 'en-GB', {hour:'2-digit', minute:'2-digit', hourCycle:'h23'}); }
+
+  function updateClock(){ var cs = clockStr(); $('#navTime').textContent = cs; $('#sheetTime').textContent = cs; }
+
+  /* ---------- відтворення ---------- */
+  function rebuildOrder(){
+    order = queue.slice();
+    if(shuffle){
+      for(var i=order.length-1;i>0;i--){ var j = Math.floor(Math.random()*(i+1)); var tmp = order[i]; order[i] = order[j]; order[j] = tmp; }
+      var k = order.indexOf(cur);
+      if(k > 0){ order.splice(k,1); order.unshift(cur); }
+    }
+    updateCount();
+  }
+  function updateCount(){
+    var i = order.indexOf(cur) + 1, n = order.length;
+    $('#sCount').textContent = T('ofCount', {i:i || 1, n:n || 1});
+  }
+  /* Бігуча стрічка: якщо текст ширший за рядок, він їде по колу з паузою на початку */
+  function marquee(box, text){
+    var inn = box.firstElementChild;
+    box.classList.remove('run');
+    inn.innerHTML = '<span></span><span></span>';
+    inn.children[0].textContent = text; inn.children[1].textContent = text;
+    var w = inn.children[0].offsetWidth;
+    if(w > box.clientWidth + 1){
+      inn.style.setProperty('--mw', (w + 48) + 'px');
+      inn.style.setProperty('--md', ((w + 48) / 34 + 1.4).toFixed(1) + 's');
+      box.classList.add('run');
+    }
+  }
+  function refreshNowText(){
+    var t = curTrack(); if(!t) return;
+    var sub = dA(t.artist) + ' — ' + dB(t.album);
+    $('#lTitle').textContent = t.title; $('#lSub').textContent = sub;
+    marquee($('#sTitle'), t.title); marquee($('#sSub'), sub);
+    updateCount();
+  }
+  function showCurAlbum(){
+    var t = curTrack(); if(!t) return;
+    closeSheet(); tab = 'albums'; stacks.albums = [{kind:'album', key:albumKey(t)}]; render('push');
+  }
+  function updateModes(){
+    $('#shuf').setAttribute('aria-pressed', shuffle ? 'true' : 'false');
+    var r = $('#rep'); r.dataset.mode = repeat; r.setAttribute('aria-pressed', repeat === 'off' ? 'false' : 'true');
+    $('#repTxt').textContent = T('repeatBtn') + (repeat === 'one' ? ' 1' : '');
+  }
+  function setLang(l){
+    if(!I18N[l]) l = 'uk';
+    lang = l; coll = new Intl.Collator(l, {numeric:true, sensitivity:'base'});
+    try{ localStorage.setItem('ios7player.lang', l); }catch(e){}
+    applyI18n(); updateModes(); updateClock(); refreshNowText(); render();
+  }
+  var lockFlip = false, lastBg = '';
+  /* розмиття раз на трек у малому canvas (дешево), замість живого CSS blur на великих шарах - це різало FPS на телефонах */
+  var blurCache = {};
+  var blurLive = false;
+  try{ blurLive = window.matchMedia('(hover:hover) and (pointer:fine)').matches; }catch(e){}
+  document.getElementById('app').classList.toggle('blurlive', blurLive);
+  function preBlur(url, bright, cb){
+    if(blurLive) return cb(url);
+    var key = bright + '|' + url;
+    if(blurCache[key]) return cb(blurCache[key]);
+    var im = new Image();
+    im.onload = function(){
+      try{
+        var N = 32, c = document.createElement('canvas'); c.width = c.height = N;
+        var g = c.getContext('2d'); g.imageSmoothingQuality = 'high';
+        var w = im.naturalWidth, h = im.naturalHeight, m = Math.min(w, h);
+        g.drawImage(im, (w - m) / 2, (h - m) / 2, m, m, 0, 0, N, N);
+        var id = g.getImageData(0, 0, N, N), d = id.data, tmp = new Float32Array(N * N * 3), src = new Float32Array(N * N * 3), i, x, y, ch, k;
+        for(i = 0; i < N * N; i++){ src[i*3] = d[i*4]; src[i*3+1] = d[i*4+1]; src[i*3+2] = d[i*4+2]; }
+        for(var pass = 0; pass < 3; pass++){
+          for(y = 0; y < N; y++) for(x = 0; x < N; x++) for(ch = 0; ch < 3; ch++){
+            var sum = 0, n = 0; for(k = -2; k <= 2; k++){ var xx = x + k; if(xx >= 0 && xx < N){ sum += src[(y*N+xx)*3+ch]; n++; } }
+            tmp[(y*N+x)*3+ch] = sum / n;
+          }
+          for(y = 0; y < N; y++) for(x = 0; x < N; x++) for(ch = 0; ch < 3; ch++){
+            var sum2 = 0, n2 = 0; for(k = -2; k <= 2; k++){ var yy = y + k; if(yy >= 0 && yy < N){ sum2 += tmp[(yy*N+x)*3+ch]; n2++; } }
+            src[(y*N+x)*3+ch] = sum2 / n2;
+          }
+        }
+        for(i = 0; i < N * N; i++){
+          var r = src[i*3], gg = src[i*3+1], b = src[i*3+2], L = .2126 * r + .7152 * gg + .0722 * b;
+          d[i*4] = Math.max(0, Math.min(255, (L + (r - L) * 1.9) * bright));
+          d[i*4+1] = Math.max(0, Math.min(255, (L + (gg - L) * 1.9) * bright));
+          d[i*4+2] = Math.max(0, Math.min(255, (L + (b - L) * 1.9) * bright));
+          d[i*4+3] = 255;
+        }
+        g.putImageData(id, 0, 0);
+        var o = document.createElement('canvas'); o.width = o.height = 96;
+        var og = o.getContext('2d'); og.imageSmoothingEnabled = true; og.imageSmoothingQuality = 'high';
+        og.drawImage(c, 0, 0, 96, 96);
+        var out = o.toDataURL('image/jpeg', .8);
+        blurCache[key] = out; cb(out);
+      }catch(e){ cb(url); }
+    };
+    im.onerror = function(){ cb(url); };
+    im.src = url;
+  }
+  function setLockBg(url){
+    if(url === lastBg) return;
+    lastBg = url;
+    preBlur(url, .66, function(bl){
+      if(url !== lastBg) return;
+      var a = $('#lBgA'), b = $('#lBgB'), next = lockFlip ? a : b, prev = lockFlip ? b : a;
+      next.style.backgroundImage = 'url("' + bl + '")'; $('#dBg').style.backgroundImage = 'url("' + bl + '")';
+      next.classList.add('show'); prev.classList.remove('show');
+      lockFlip = !lockFlip;
+    });
+    lockTone(url);
+  }
+  /* темний напис, як в iOS 7, але якщо фон майже чорний - світлий, щоб було видно */
+  function lockTone(url){
+    var im = new Image();
+    im.onload = function(){
+      try{
+        var c = document.createElement('canvas'); c.width = c.height = 8;
+        var g = c.getContext('2d'); g.drawImage(im, 0, 0, 8, 8);
+        var d = g.getImageData(0, 0, 8, 8).data, r = 0, gg = 0, b = 0, n = 64;
+        for(var i = 0; i < d.length; i += 4){ r += d[i]; gg += d[i+1]; b += d[i+2]; }
+        function lin(v){ v = v / n / 255 * .66 * .72; return Math.pow(v, 2.2); }
+        var L = .2126 * lin(r) + .7152 * lin(gg) + .0722 * lin(b);
+        lockEl.setAttribute('data-tone', L > .02 ? 'dark' : 'light');
+      }catch(e){ lockEl.setAttribute('data-tone', 'light'); }
+    };
+    im.src = url;
+  }
+  function setTrack(id){
+    cur = id;
+    var t = byId(id); if(!t) return;
+    audio.src = t.url;
+    var c = coverFor(t);
+    $('#sArt').src = c; $('#lArt').src = c; $('#dArt').src = c; lockEl.classList.remove('noart');
+    refreshNowText();
+    setLockBg(c);
+    updateNow(); markPlaying(); tick(); setMedia(t, c);
+  }
+  function playTrack(id, fromList){
+    if(fromList) queue = fromList.map(function(t){ return t.id; });
+    if(queue.indexOf(id) < 0) queue.push(id);
+    cur = id; rebuildOrder(); setTrack(id);
+    var pr = audio.play(); if(pr && pr.catch) pr.catch(onPlayFail);
+  }
+  function onPlayFail(err){ if(err && err.name !== 'AbortError' && err.name !== 'NotAllowedError') toast(T('tPlayFail')); }
+  function toggle(){
+    if(cur == null){ computeVis(); if(vis.length) playTrack(vis[0].id, vis); return; }
+    if(audio.paused){ var pr = audio.play(); if(pr && pr.catch) pr.catch(onPlayFail); } else audio.pause();
+  }
+  function step(dir, auto){
+    if(!order.length) return;
+    var i = order.indexOf(cur);
+    if(dir > 0){
+      if(auto && repeat === 'one'){ audio.currentTime = 0; audio.play().catch(onPlayFail); return; }
+      if(i + 1 < order.length) return playTrack(order[i+1]);
+      if(repeat === 'all' || !auto){ if(shuffle) rebuildOrder(); return playTrack(order[0]); }
+      audio.pause(); audio.currentTime = 0; tick();
+    } else {
+      if(audio.currentTime > 3){ audio.currentTime = 0; return; }
+      playTrack(order[i > 0 ? i-1 : order.length-1]);
+    }
+  }
+
+  /* ---------- прогрес ---------- */
+  function tick(){
+    var t = curTrack();
+    var d = isFinite(audio.duration) && audio.duration > 0 ? audio.duration : (t ? t.duration : 0);
+    var c = audio.currentTime || 0;
+    if(scrub && scrubSrc) c = (scrubSrc.value / 1000) * d;
+    else { var sp = d ? Math.round(c / d * 1000) : 0; seeks.forEach(function(el){ el.value = sp; }); }
+    seeks.forEach(function(el){ setP(el); });
+    var cs = fmt(c), rs = '-' + fmt(Math.max(0, d - c));
+    $('#tCur').textContent = cs; $('#tRem').textContent = rs;
+    $('#lCur').textContent = cs; $('#lRem').textContent = rs;
+  }
+  seeks.forEach(function(el){
+    el.addEventListener('input', function(){ scrub = true; scrubSrc = el; tick(); });
+    el.addEventListener('change', function(){
+      var d = isFinite(audio.duration) ? audio.duration : 0;
+      if(d) audio.currentTime = el.value / 1000 * d;
+      scrub = false; scrubSrc = null; tick();
+    });
+  });
+  audio.addEventListener('timeupdate', tick);
+  audio.addEventListener('durationchange', function(){
+    var t = curTrack();
+    if(t && isFinite(audio.duration) && audio.duration > 0 && !t.duration){ t.duration = audio.duration; updateDur(t); }
+    tick();
+  });
+  audio.addEventListener('play', function(){ app.classList.add('playing'); failStreak = 0; if('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing'; });
+  audio.addEventListener('pause', function(){ app.classList.remove('playing'); if('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused'; });
+  audio.addEventListener('ended', function(){ step(1, true); });
+  audio.addEventListener('error', function(){
+    if(cur == null) return;
+    toast(T('tPlayFail'));
+    if(++failStreak < 3) step(1, true);
+  });
+
+  function setMedia(t, c){
+    if(!('mediaSession' in navigator)) return;
+    try{
+      navigator.mediaSession.metadata = new MediaMetadata({title:t.title, artist:dA(t.artist), album:dB(t.album), artwork:[{src:c, sizes:'360x360'}]});
+      navigator.mediaSession.setActionHandler('play', toggle);
+      navigator.mediaSession.setActionHandler('pause', toggle);
+      navigator.mediaSession.setActionHandler('previoustrack', function(){ step(-1); });
+      navigator.mediaSession.setActionHandler('nexttrack', function(){ step(1); });
+    }catch(e){}
+  }
+
+  /* ---------- керування ---------- */
+  $('#play').addEventListener('click', toggle);
+  $('#next').addEventListener('click', function(){ step(1); });
+  $('#prev').addEventListener('click', function(){ step(-1); });
+  $('#closeSheet').addEventListener('click', closeSheet);
+  function openSheet(){ sheet.classList.add('open'); refreshNowText(); }
+  function closeSheet(){ sheet.classList.remove('open'); }
+
+  $('#shuf').addEventListener('click', function(){
+    shuffle = !shuffle; rebuildOrder(); updateModes(); toast(T(shuffle ? 'tShufOn' : 'tShufOff'));
+  });
+  $('#rep').addEventListener('click', function(){
+    repeat = repeat === 'off' ? 'all' : repeat === 'all' ? 'one' : 'off';
+    updateModes(); toast(T(repeat === 'off' ? 'tRepOff' : repeat === 'all' ? 'tRepAll' : 'tRepOne'));
+  });
+  $('#sList').addEventListener('click', showCurAlbum);
+  function setVol(v){ vol.value = v; lVol.value = v; audio.volume = v / 100; setP(vol); setP(lVol); }
+  [vol, lVol].forEach(function(el){
+    el.addEventListener('input', function(){
+      setVol(el.value);
+      try{ localStorage.setItem('ios7player.vol', el.value); }catch(e){}
+    });
+  });
+  try{ var sv = localStorage.getItem('ios7player.vol'); if(sv !== null && !isNaN(+sv)) vol.value = +sv; }catch(e){}
+  setVol(vol.value);
+
+  $('#file').addEventListener('change', function(e){ addFiles(e.target.files); e.target.value = ''; });
+  $('#dir').addEventListener('change', function(e){ addFiles(e.target.files); e.target.value = ''; });
+
+  var dragN = 0, dropEl = $('#drop');
+  window.addEventListener('dragenter', function(e){ if(e.dataTransfer && Array.prototype.indexOf.call(e.dataTransfer.types, 'Files') >= 0){ dragN++; dropEl.classList.add('show'); } });
+  window.addEventListener('dragleave', function(){ dragN = Math.max(0, dragN - 1); if(!dragN) dropEl.classList.remove('show'); });
+  window.addEventListener('dragover', function(e){ e.preventDefault(); });
+  window.addEventListener('drop', function(e){ e.preventDefault(); dragN = 0; dropEl.classList.remove('show'); if(e.dataTransfer && (e.dataTransfer.files.length || (e.dataTransfer.items && e.dataTransfer.items.length))){ var dt = e.dataTransfer; filesFromDrop(dt).then(addFiles); } });
+
+  document.addEventListener('keydown', function(e){
+    var tg = e.target;
+    if(tg && /^(INPUT|TEXTAREA)$/.test(tg.tagName)) return;
+    var inBtn = tg && tg.closest && tg.closest('button,[role=button]');
+    if(e.key === ' '){ if(inBtn) return; e.preventDefault(); toggle(); }
+    else if(e.key === 'ArrowRight') step(1);
+    else if(e.key === 'ArrowLeft') step(-1);
+    else if(e.key === 'Escape') closeSheet();
+    else if(e.key === 'l' || e.key === 'L' || e.key === 'д' || e.key === 'Д') lockScreen();
+  });
+
+  /* ---------- екран блокування ---------- */
+  var lTime = $('#lTime'), slide = $('#lSlide'), slideTxt = $('#lSlideTxt'), clockTimer = null, drag = null;
+  function updateTime(){
+    var s = clockStr();
+    if(lTime.textContent !== s) lTime.textContent = s;
+  }
+  function lockScreen(){
+    if(locked) return;
+    deskApply(deskPref);
+    locked = true; closeSheet();
+    lockEl.classList.remove('snap'); lockEl.style.transform = '';
+    lockEl.classList.add('on'); lockEl.setAttribute('aria-hidden', 'false');
+    slideTxt.style.opacity = '';
+    updateTime(); clearInterval(clockTimer); clockTimer = setInterval(updateTime, 1000);
+    tick();
+    try{ slide.focus({preventScroll:true}); }catch(e){}
+  }
+  /* 30 с без дій - сам іде на екран блокування (як iOS) */
+  var lastAct = Date.now();
+  function touchAct(){ lastAct = Date.now(); }
+  ['pointerdown','pointermove','pointerup','keydown','wheel','touchstart','input'].forEach(function(n){ window.addEventListener(n, touchAct, {passive:true, capture:true}); });
+  setInterval(function(){ if(autoSec && !locked && Date.now() - lastAct >= autoSec * 1000) lockScreen(); }, 1000);
+  /* режим 16:9: тільки екран блокування (обкладинка зліва, панель справа); інтерфейс - стандартний вертикальний, після розблокування */
+  function deskApply(on){
+    if(deskMode === on) return;
+    deskMode = on; app.classList.toggle('desk', on); fitApp();
+  }
+  function toggleDesk(){
+    deskPref = !deskPref;
+    try{ localStorage.setItem('ios7player.desk', deskPref ? '1' : '0'); }catch(e){}
+    render();
+  }
+  function revealPhone(){
+    if(!deskMode) return;
+    var r = document.body.getBoundingClientRect(), kn = Math.min(r.width / 320, r.height / appH), kd = Math.min(r.width / 1280, r.height / 720), k = kn / kd;
+    app.style.setProperty('--pk', k); app.style.setProperty('--px', ((1280 - 320 * k) / 2) + 'px'); app.style.setProperty('--py', ((720 - appH * k) / 2) + 'px');
+    app.classList.add('deskout');
+  }
+  function unlock(){
+    if(!locked) return;
+    locked = false; lastAct = Date.now(); clearInterval(clockTimer);
+    revealPhone();
+    lockEl.classList.add('snap'); lockEl.style.transform = 'translateX(100%)';
+    setTimeout(function(){
+      if(locked) return;
+      lockEl.style.transition = 'none';
+      lockEl.classList.remove('on', 'snap'); lockEl.style.transform = ''; lockEl.setAttribute('aria-hidden', 'true');
+      void lockEl.offsetWidth;
+      lockEl.style.transition = '';
+      deskApply(false); app.classList.remove('deskout');
+    }, deskMode ? 400 : 320);
+  }
+  slide.addEventListener('pointerdown', function(e){
+    if(e.button > 0) return;
+    drag = {x:e.clientX, dx:0}; revealPhone();
+    lockEl.classList.remove('snap');
+    try{ slide.setPointerCapture(e.pointerId); }catch(err){}
+  });
+  slide.addEventListener('pointermove', function(e){
+    if(!drag) return;
+    drag.dx = Math.max(0, (e.clientX - drag.x) / scaleK);
+    lockEl.style.transform = 'translateX(' + drag.dx + 'px)';
+    slideTxt.style.opacity = Math.max(0, 1 - drag.dx / 160);
+  });
+  function endDrag(){
+    if(!drag) return;
+    var dx = drag.dx; drag = null;
+    if(dx > 96) unlock();
+    else {
+      lockEl.classList.add('snap'); lockEl.style.transform = ''; slideTxt.style.opacity = '';
+      setTimeout(function(){ if(locked){ lockEl.classList.remove('snap'); app.classList.remove('deskout'); } }, 320);
+    }
+  }
+  slide.addEventListener('pointerup', endDrag);
+  slide.addEventListener('pointercancel', endDrag);
+  slide.addEventListener('keydown', function(e){ if(e.key === 'Enter') unlock(); });
+  $('#sheetLock').addEventListener('click', lockScreen);
+  $('#lPlay').addEventListener('click', toggle);
+  $('#lPrev').addEventListener('click', function(){ step(-1); });
+  $('#lNext').addEventListener('click', function(){ step(1); });
+
+  /* ---------- старт ---------- */
+  try{ var sl = localStorage.getItem('ios7player.lang'); if(sl && I18N[sl]) lang = sl; }catch(e){}
+  coll = new Intl.Collator(lang, {numeric:true, sensitivity:'base'});
+  applyI18n(); updateModes();
+  try{ skin = localStorage.getItem('ios7player.skin') || 'light'; }catch(e){}
+  if(skin !== 'light' && skin !== 'dark' && skin !== 'auto') skin = 'light';
+  applySkin(skin);
+  preBlur(DEFAULT_COVER, .42, function(bl){ $('#nocBg').style.backgroundImage = 'url("' + bl + '")'; });
+  computeVis();
+  queue = vis.map(function(t){ return t.id; });
+  if(vis.length){ cur = vis[0].id; rebuildOrder(); setTrack(cur); }
+  else { setLockBg(DEFAULT_COVER); lockEl.classList.add('noart'); }
+  render();
+  tick(); updateNow(); updateClock(); setInterval(updateClock, 15000);
+  restoreSaved();
+  if(document.fonts && document.fonts.ready) document.fonts.ready.then(refreshNowText);
+})();
+</script>
+<script>if('serviceWorker' in navigator && /^https?:/.test(location.protocol)){ window.addEventListener('load', function(){ try{ navigator.serviceWorker.register('sw.js'); }catch(e){} }); }</script></body></html>
