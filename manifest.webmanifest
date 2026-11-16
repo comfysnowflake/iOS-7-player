@@ -2,7 +2,7 @@
   "name": "Плеєр iOS 7",
   "short_name": "Плеєр",
   "description": "Музичний плеєр у стилі iOS 7",
-  "start_url": "./player.html",
+  "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
