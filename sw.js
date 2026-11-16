@@ -1,6 +1,6 @@
 /* Плеєр iOS 7: офлайн-кеш. Мережа в пріоритеті (щоб оновлення приходили), кеш - запасний варіант. */
 var CACHE = 'ios7player-v1';
-var FILES = ['./', './player.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
+var FILES = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 self.addEventListener('install', function(e){
   e.waitUntil(caches.open(CACHE).then(function(c){
     return Promise.all(FILES.map(function(u){ return c.add(u).catch(function(){}); }));
